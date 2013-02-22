@@ -1,0 +1,120 @@
+#NEXUS
+[Johan Nylander 2004-07-01]
+
+[! ***** MrModeltest block -- Modified from MODELTEST 3.0 *****]
+
+[The following command will calculate a NJ tree using the JC69 model of evolution]
+
+BEGIN PAUP;
+	Log file= mrmodelfit.log replace;
+	DSet distance=JC objective=ME base=equal rates=equal pinv=0
+	subst=all negbrlen=setzero;
+	NJ showtree=no breakties=random;
+End;
+
+[!
+***** BEGIN TESTING 24 MODELS OF EVOLUTION ***** ]
+
+BEGIN PAUP;
+	Default lscores longfmt=yes; [Workaround for the bug in PAUP 4b10]
+	Set criterion=like;
+
+	[!
+	** Model 1 of 24 * Calculating JC **]
+	lscores  1/ nst=1  base=equal  rates=equal  pinv=0
+	scorefile=mrmodel.scores replace;
+	[!
+	** Model 2 of 24 * Calculating JC+I **]
+	lscores  1/ nst=1  base=equal  rates=equal  pinv=est
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 3 of 24 * Calculating JC+G **]
+	lscores  1/ nst=1  base=equal  rates=gamma  shape=est  pinv=0
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 4 of 24 * Calculating JC+I+G **]
+	lscores  1/ nst=1  base=equal  rates=gamma  shape=est  pinv=est
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 5 of 24 * Calculating F81 **]
+	lscores  1/ nst=1  base=est  rates=equal  pinv=0
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 6 of 24 * Calculating F81+I **]
+	lscores  1/ nst=1  base=est  rates=equal  pinv=est
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 7 of 24 * Calculating F81+G **]
+	lscores  1/ nst=1  base=est  rates=gamma  shape=est  pinv=0
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 8 of 24 * Calculating F81+I+G **]
+	lscores  1/ nst=1  base=est  rates=gamma  shape=est  pinv=est
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 9 of 24 * Calculating K80 **]
+	lscores  1/ nst=2  base=equal  tratio=est  rates=equal  pinv=0
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 10 of 24 * Calculating K80+I **]
+	lscores  1/ nst=2  base=equal  tratio=est  rates=equal  pin=est
+	scorefile=mrmodel.scores  append; 
+	[!
+	** Model 11 of 24 * Calculating K80+G **]
+	lscores  1/ nst=2  base=equal  tratio=est  rates=gamma  shape=est  pinv=0
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 12 of 24 * Calculating K80+I+G **]
+	lscores  1/ nst=2  base=equal  tratio=est  rates=gamma  shape=est pinv=est
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 13 of 24 * Calculating HKY **]
+	lscores  1/ nst=2  base=est  tratio=est  rates=equal  pinv=0
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 14 of 24 * Calculating HKY+I **]
+	lscores  1/ nst=2  base=est  tratio=est  rates=equal  pinv=est
+	scorefile=mrmodel.scores  append; 
+	[!
+	** Model 15 of 24 * Calculating HKY+G **] 
+	lscores  1/ nst=2  base=est  tratio=est  rates=gamma  shape=est  pinv=0
+	scorefile=mrmodel.scores  append; 
+	[!
+	** Model 16 of 24 * Calculating HKY+I+G **] 
+	lscores  1/ nst=2  base=est  tratio=est  rates=gamma  shape=est  pinv=est
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 17 of 24 * Calculating SYM **]
+	lscores  1/ nst=6  base=equal  rmat=est  rclass= (a b c d e f)  rates=equal  pinv=0
+	scorefile=mrmodel.scores  append; 
+	[!
+	** Model 18 of 24 * Calculating SYM+I **]
+	lscores  1/ nst=6  base=equal  rmat=est  rates=equal  pinv=est
+	scorefile=mrmodel.scores  append; 
+	[!
+	** Model 19 of 24 * Calculating SYM+G **]
+	lscores  1/ nst=6  base=equal  rmat=est  rates=gamma  shape=est pinv=0
+	scorefile=mrmodel.scores  append; 
+	[!
+	** Model 20 of 24 * Calculating SYM+I+G **]
+	lscores  1/ nst=6  base=equal  rmat=est  rates=gamma  shape=est pinv=est
+	scorefile=mrmodel.scores  append;
+	[!
+	** Model 21 of 24 * Calculating GTR **]
+	lscores  1/ nst=6  base=est  rmat=est  rates=equal  pinv=0
+	scorefile=mrmodel.scores  append; 
+	[!
+	** Model 22 of 24 * Calculating GTR+I **]
+	lscores  1/ nst=6  base=est  rmat=est  rates=equal  pinv=est
+	scorefile=mrmodel.scores  append; 
+	[!
+	** Model 23 of 24 * Calculating GTR+G **]
+	lscores  1/ nst=6  base=est  rmat=est  rates=gamma  shape=est pinv=0
+	scorefile=mrmodel.scores  append; 
+	[!
+	** Model 24 of 24 * Calculating GTR+I+G **]
+	lscores  1/ nst=6  base=est  rmat=est  rates=gamma  shape=est pinv=est
+	scorefile=mrmodel.scores  append;
+
+	Log stop=yes;
+END;

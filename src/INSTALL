@@ -1,0 +1,21 @@
+02/22/2013 02:27:42 PM
+
+To compile (and install):
+
+    make
+
+Then move the generated binary ("mrmodeltest2") somewhere in the PATH. 
+
+
+
+For Mac users:
+
+The Makefile.MACOSX is not tested recently.
+Try changing the 'CFLAGS -L' option if in trouble.
+
+
+For compiling on windows:
+
+Uncomment the lines in mrmodeltest2.c saying "For windows"
+Then compile using your favourite Windows C compiler (I used mingw in the past).
+
