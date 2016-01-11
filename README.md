@@ -44,14 +44,11 @@ Quick instructions
 
 Installing the pre-build program on Windows or MacOSX
 
-[Note: windows and mac precompiled executables are not hosted here.
-See http://www.abc.se/~nylander/mrmodeltest2/bin.zip]
+1. Find the appropriate binary file for your operating system (in the
+'bin' folder) and use directly (see Running MrModeltest2 below) or, preferrably,
+copy it to a location included in your PATH.
 
-1. Find the appropriate binary file for your operating system and use directly 
-(see Running MrModeltest2 below) or, preferrably, copy it to a location 
-included in your PATH.
-
-Note: The windows version is compiled and tested on WinXP.
+Note: The windows version is compiled and tested on Win XP.
 
 
 Installing from source (on UNIX/MacOSX)
