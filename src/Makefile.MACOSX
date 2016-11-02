@@ -1,13 +1,15 @@
 CC = gcc
-CFLAGS  = -O3  -L/usr/lib
+CFLAGS  = -O3 -Wno-unused-result -Wall -L/usr/lib
 LIBS = -lm
 
 TARGET = mrmodeltest2
 
+SRC = $(TARGET).c
+
 all: $(TARGET)
 
-$(TARGET): $(TARGET).c
-	$(CC) $(CFLAGS) -o $(TARGET) $(TARGET).c $(LIBS)
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LIBS)
 
 clean:
 	$(RM) $(TARGET)
