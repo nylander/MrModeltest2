@@ -1,11 +1,10 @@
 MrModeltest2
 ============
 
-C program for selecting DNA substitution models using PAUP\*
-[http://paup.csit.fsu.edu](http://paup.csit.fsu.edu)
+C program for selecting DNA substitution models using [PAUP\*](https://people.sc.fsu.edu/~dswofford/paup_test/).
 
 
-MrModeltest 2.3 README, May 22 2008
+MrModeltest 2.3 README, May 22 2008 (2016)
 
 MrModeltest 2.3 by Johan A. A. Nylander, Dept. Systematic Zoology, EBC, Uppsala 
 University, Sweden. Orignal code by David Posada, U. Vigo, Spain.
