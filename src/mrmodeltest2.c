@@ -1,7 +1,7 @@
 /*
-    Title:            MrModeltest
+    Title:            MrModeltest2
     Version:          UNIX, MacOSX, Win32
-    Latest changes:   11/02/2016 09:05:28 PM
+    Latest changes:   11/03/2016 01:10:12 PM
     Programmer:       Johan Nylander
                       Uppsala University
                       E-mail: johan.nylander@ebc.uu.se
@@ -29,11 +29,11 @@
     Purpose: Evaluate the fit of several models of evolution to a given data and unrooted tree.
     Compare different models of DNA substitution using likelihood ratio test (and a chi-square distribution)
     or/and the AIC criterion
-    
+
     COPYRIGHT
     --------
     Copyright (C) 1998-2004 David Posada
-    Facultad de Biolog’a, Universidad de Vigo. 36200 Vigo, Spain    
+    Facultad de Biolog’a, Universidad de Vigo. 36200 Vigo, Spain
     dposada@uvigo.es
 
     This program is free software; you can redistribute it and/or
@@ -59,7 +59,7 @@
                                so changes were done to read this new file
     Version 3.0 (February 00): Several aesthetic changes
     Version 3.01(March 00):    The program ouputs now a block of PAUP commands
-                               to implement the likelihood settings for the best-fit model                
+                               to implement the likelihood settings for the best-fit model
     Version 3.02 (June 00):    The frequencies of C and G were interchanged in the output. Fixed. Thanks to Carlos Lopez-Vaamonde
     Version 3.03 (June 00):    The mixed chi-square distribution is added for I and G tests
     Version 3.04 (July 00):    Several cosmetic changes
@@ -81,7 +81,7 @@
     Version 3.4 (March 04):    There was a typo printing the Rd value for K81uf+I.
                                It was printing p-inv instead. (thanks to Michael Sorenson)
     Version 3.5 (May 04):      This is a minor update that does not affect the calculations. AIC weights were sorted by
-                               their value, but because these can be almost zero (zero for the computer) for several models, 
+                               their value, but because these can be almost zero (zero for the computer) for several models,
                                their order would not make sense in the light of the AIC values.
                                Now the program order the AIC weights by the AIC scores.
     Version 3.6 beta (Nov 04): The program includes now model averaged estimates
@@ -169,7 +169,7 @@ float TestInvariableSites(ModelSt *, ModelSt *);
 
 /* Global variables */
 ModelSt *JC, *F81;
-ModelSt *JC, *JCI, *JCG, *JCIG, *F81, *F81I, *F81G, *F81IG, *K80, *K80I, *K80G, *K80IG; 
+ModelSt *JC, *JCI, *JCG, *JCIG, *F81, *F81I, *F81G, *F81IG, *K80, *K80I, *K80G, *K80IG;
 ModelSt *HKY, *HKYI, *HKYG, *HKYIG, *SYM, *SYMI, *SYMG, *SYMIG, *GTR, *GTRI, *GTRG, *GTRIG;
 float score[168];
 float ln[NUM_MODELS];
@@ -207,7 +207,7 @@ float fA, fC, fG, fT;
 float TiTv;
 float Ra, Rb, Rc, Rd, Re, Rf;
 float shape;
-float pinv; 
+float pinv;
 float theln;
 
 /****************************** MAIN ***********************************/
@@ -322,7 +322,7 @@ int main(int argc, char **argv)
     }
     CalculateAIC();
     SetModel(modelAIC);
-    if (format == 0) {    
+    if (format == 0) {
         Output (modelAIC,minAIC);
         PrintPaupBlock(NO);
         PrintMbBlock(NO);
@@ -351,7 +351,7 @@ static void PrintRunSettings()
     /* Check settings */
     fprintf (stdout,"\n\nRun settings\n");
     if (sampleSize > 0) {
-        useAICc = YES;    
+        useAICc = YES;
         /* Check the data is large enough*/
         if (sampleSize <= model[NUM_MODELS-1].parameters) {
             fprintf (stdout, "\n\nYou have more parameters than data for some models!");
@@ -362,7 +362,7 @@ static void PrintRunSettings()
         fprintf (stdout, "\n   sample size = %d", sampleSize);
     }
     else {
-        useAICc = NO;    
+        useAICc = NO;
         fprintf (stdout, "\n Using the standard AIC (not the AICc)");
     }
     if (numTaxa > 0) {
@@ -527,7 +527,7 @@ static void ReadPaupScores()
             }
         }
     }
-    if (ferror(stdin)) { 
+    if (ferror(stdin)) {
         perror ("MrModeltest");
         clearerr(stdin);
     }
@@ -673,7 +673,7 @@ static void ReadScores()
         i++;
     }
     Initialize();
-    for (j = 0; j < NUM_MODELS; j++) {    
+    for (j = 0; j < NUM_MODELS; j++) {
         if (model[j].ln == 0 || i < 167) {
             printf("\n\nThe input file is incomplete or incorrect. \nAre you using the most updated block of PAUP* commands?.\n ");
             exit(0);
@@ -809,7 +809,7 @@ float TestInvariableSites (ModelSt *model0, ModelSt *model1)
     else {
         P = LRT(model0, model1);
     }
-    return P;    
+    return P;
 }
 
 /**************  ChiSquare: probability of chi square value *************/
@@ -1004,11 +1004,11 @@ void AkaikeWeights ()
         orderedAIC[i] = i;
     }
     /* Sort by AIC score to print weights in order*/
-    sorted = NO; 
-    pass = 1; 
+    sorted = NO;
+    pass = 1;
     while (sorted == NO) {
         sorted = YES;
-        for (i = 0; i < (NUM_MODELS - pass); i++) { 
+        for (i = 0; i < (NUM_MODELS - pass); i++) {
              if (ord[i] > ord [i + 1]) {
                 temp = ord[i + 1];
                 ord[i + 1]= ord[i];
@@ -1016,11 +1016,11 @@ void AkaikeWeights ()
                 temp = orderedAIC[i + 1];
                 orderedAIC[i + 1] = orderedAIC[i];
                 orderedAIC[i] = temp;
-                sorted = NO; 
+                sorted = NO;
               }
-        }    
-        pass++;    
-    } 
+        }
+        pass++;
+    }
     printf ("\n\n\n ** MODEL SELECTION UNCERTAINTY : Akaike Weights **");
     if (useAICc == NO) {
         printf ("\n\nModel\t\t-lnL\t\tK\t AIC\t\t delta\t\tWeight\t\tCumWeight");
@@ -1103,7 +1103,7 @@ void ModelAveraging()
 
     ifA = ifC = ifG = ifT = ititv = iRa = iRb = iRc = iRd = iRe = ipinvI = ialphaG = ipinvIG = ialphaIG = 0;
     wfA = wfC = wfG = wfT = wtitv = wRa = wRb = wRc = wRd = wRe = wpinvI = walphaG = wpinvIG = walphaIG = 0;
-    
+
     if (averagingConfidenceInterval < 1) {
         minWeightToAverage = FindMinWeightToAverage ();
     }
@@ -1111,7 +1111,7 @@ void ModelAveraging()
         minWeightToAverage = 0.0;
         cumConfidenceWeight = 1.0;
     }
-    
+
     /* calculate importances and model-averaged estimates */
     AverageEstimates ("fA",12, mfA, efA, &ifA, &wfA, minWeightToAverage);
     AverageEstimates ("fC",12, mfC, efC, &ifC, &wfC, minWeightToAverage);
@@ -1127,7 +1127,7 @@ void ModelAveraging()
     AverageEstimates ("alpha(G)",6, malphaG, ealphaG, &ialphaG, &walphaG, minWeightToAverage);
     AverageEstimates ("pinv(IG)",12, mpinvIG, epinvIG, &ipinvIG, &wpinvIG, minWeightToAverage);
     AverageEstimates ("alpha(IG)",12, malphaIG, ealphaIG, &ialphaIG, &walphaIG, minWeightToAverage);
-    
+
     /* print results */
     printf ("\n\n\n\n* MODEL AVERAGING AND PARAMETER IMPORTANCE (using Akaike Weights)");
     if (averagingConfidenceInterval == 1) {
@@ -1146,16 +1146,16 @@ void ModelAveraging()
     printf ("\nfC\t\t\t%6.4f\t\t%11s",ifC, CheckNA(wfC));
     printf ("\nfG\t\t\t%6.4f\t\t%11s",ifG, CheckNA(wfG));
     printf ("\nfT\t\t\t%6.4f\t\t%11s",ifT, CheckNA(wfT));
-    printf ("\nTiTv\t\t\t%6.4f\t\t%11s",ititv, CheckNA(wtitv)); 
+    printf ("\nTiTv\t\t\t%6.4f\t\t%11s",ititv, CheckNA(wtitv));
     printf ("\nrAC\t\t\t%6.4f\t\t%11s",iRa, CheckNA(wRa));
     printf ("\nrAG\t\t\t%6.4f\t\t%11s",iRb, CheckNA(wRb));
     printf ("\nrAT\t\t\t%6.4f\t\t%11s",iRc, CheckNA(wRc));
     printf ("\nrCG\t\t\t%6.4f\t\t%11s",iRd, CheckNA(wRd));
     printf ("\nrCT\t\t\t%6.4f\t\t%11s",iRe, CheckNA(wRe));
-    printf ("\npinv(I)\t\t\t%6.4f\t\t%11s",ipinvI, CheckNA(wpinvI)); 
+    printf ("\npinv(I)\t\t\t%6.4f\t\t%11s",ipinvI, CheckNA(wpinvI));
     printf ("\nalpha(G)\t\t%6.4f\t\t%11s",ialphaG, CheckNA(walphaG));
     printf ("\npinv(I+IG)\t\t%6.4f\t\t%11s",ipinvIG, CheckNA(wpinvIG));
-    printf ("\nalpha(G+IG)\t\t%6.4f\t\t%11s",ialphaIG, CheckNA(walphaIG)); 
+    printf ("\nalpha(G+IG)\t\t%6.4f\t\t%11s",ialphaIG, CheckNA(walphaIG));
     printf ("\n----------------------------------------------------");
 
     printf ("\nNote: values have been rounded.");
@@ -1216,14 +1216,14 @@ double FindMinWeightToAverage ()
 }
 
 /*********************** AICfile ****************************/
-/* reads likelihood scores from a file and calculates their AIC */ 
+/* reads likelihood scores from a file and calculates their AIC */
 /* values, choosing the minimum */
 void AICfile()
 {
-    float ln[100];               
-    int n[100];                  
-    float AIC[100];               
-    float min_AIC;              
+    float ln[100];
+    int n[100];
+    float AIC[100];
+    float min_AIC;
     int i, j;
 
     i = 0;
@@ -1473,11 +1473,11 @@ static void Output(char *selection, float value)
     else {
         printf("\n     Rate matrix");
         printf("\n     R(a) [A-C] = \t%7.4f", Ra);
-        printf("\n     R(b) [A-G] = \t%7.4f", Rb); 
+        printf("\n     R(b) [A-G] = \t%7.4f", Rb);
         printf("\n     R(c) [A-T] = \t%7.4f", Rc);
-        printf("\n     R(d) [C-G] = \t%7.4f", Rd); 
+        printf("\n     R(d) [C-G] = \t%7.4f", Rd);
         printf("\n     R(e) [C-T] = \t%7.4f", Re);
-        printf("\n     R(f) [G-T] = \t%7.4f", 1.0); 
+        printf("\n     R(f) [G-T] = \t%7.4f", 1.0);
     }
     printf("\n   Among-site rate variation");
     if (pinv == 0) {
@@ -1552,7 +1552,7 @@ static void SetModel(char *selection)
     else if (!strcmp (selection, "K80+I")) {
         TiTv = score[45];
         pinv = score[46];
-    }   
+    }
     else if (!strcmp (selection, "K80+G")) {
         TiTv = score[49];
         shape = score[50];
@@ -1710,7 +1710,7 @@ void hLRT()
                     }
                 }
                 else {
-                    if (TestInvariableSites (HKY, HKYI) < alpha) {/*  23, 24 */
+                    if (TestInvariableSites (HKY, HKYI) < alpha) { /*  23, 24 */
                         strcpy(modelhLRT,"HKY+I"); /* 26 */
                     }
                     else {
@@ -1740,8 +1740,8 @@ void hLRT()
     }
     else {
         if (TestTiequalsTv (JC, K80) < alpha) { /* 37 , 38 */
-            if (TestEqualTiAndEqualTvRates (K80, SYM) < alpha) {/* 39 , 40 */
-                if (TestEqualSiteRates (SYM, SYMG) < alpha) {/* 41 , 42 */
+            if (TestEqualTiAndEqualTvRates (K80, SYM) < alpha) { /* 39 , 40 */
+                if (TestEqualSiteRates (SYM, SYMG) < alpha) { /* 41 , 42 */
                     if (TestInvariableSites (SYMG, SYMIG) < alpha) { /*  43,  44*/
                         strcpy(modelhLRT,"SYM+I+G"); /* 46 */
                     }
@@ -1768,7 +1768,7 @@ void hLRT()
                     }
                 }
                 else {
-                    if (TestInvariableSites (K80, K80I) < alpha) {/*  57, 58 */
+                    if (TestInvariableSites (K80, K80I) < alpha) { /*  57, 58 */
                         strcpy(modelhLRT,"K80+I"); /* 60 */
                     }
                     else {
@@ -1787,7 +1787,7 @@ void hLRT()
                 }
             }
             else {
-                if (TestInvariableSites (JC, JCI) < alpha) {/*  67, 68 */
+                if (TestInvariableSites (JC, JCI) < alpha) {/* 67, 68 */
                     strcpy(modelhLRT,"JC+I"); /* 70 */
                 }
                 else {
@@ -1805,7 +1805,7 @@ void hLRT2()
     if (TestEqualBaseFrequencies (SYMIG, GTRIG) < alpha) { /*A*/
         if (TestEqualTiAndEqualTvRates (HKYIG, GTRIG) < alpha) { /*B*/
             if (TestEqualSiteRates (GTRI, GTRIG) < alpha) { /*C*/
-                if (TestInvariableSites (GTRG, GTRIG) < alpha) {  /*D*/
+                if (TestInvariableSites (GTRG, GTRIG) < alpha) { /*D*/
                     strcpy(modelhLRT2,"GTR+I+G");
                 }
                 else {
@@ -1832,7 +1832,7 @@ void hLRT2()
                     }
                 }
                 else {
-                    if (TestInvariableSites (HKY, HKYI) < alpha) {  /*I*/
+                    if (TestInvariableSites (HKY, HKYI) < alpha) { /*I*/
                         strcpy(modelhLRT2,"HKY+I");
                     }
                     else {
@@ -1841,7 +1841,7 @@ void hLRT2()
                 }
             }
             else {
-                if (TestEqualSiteRates (F81I, F81IG) < alpha) {  /*J*/
+                if (TestEqualSiteRates (F81I, F81IG) < alpha) { /*J*/
                     if (TestInvariableSites (F81G, F81IG) < alpha) { /*K*/
                         strcpy(modelhLRT2,"F81+I+G");
                     }
@@ -1850,20 +1850,20 @@ void hLRT2()
                     }
                 }
                 else {
-                    if (TestInvariableSites (F81, F81I) < alpha) {  /*L*/
+                    if (TestInvariableSites (F81, F81I) < alpha) { /*L*/
                         strcpy(modelhLRT2,"F81+I");
                     }
                     else {
                         strcpy(modelhLRT2,"F81");
                     }
-                } 
+                }
             }
         }
     }
     else {
         if (TestEqualTiAndEqualTvRates (K80IG, SYMIG) < alpha) { /*M*/
             if (TestEqualSiteRates (SYMI, SYMIG) < alpha) { /*N*/
-                if (TestInvariableSites (SYMG, SYMIG) < alpha) {  /*O*/
+                if (TestInvariableSites (SYMG, SYMIG) < alpha) { /*O*/
                     strcpy(modelhLRT2,"SYM+I+G");
                 }
                 else {
@@ -1871,7 +1871,7 @@ void hLRT2()
                 }
             }
             else {
-                if (TestInvariableSites (SYM, SYMI) < alpha) {  /*P*/
+                if (TestInvariableSites (SYM, SYMI) < alpha) { /*P*/
                     strcpy(modelhLRT2,"SYM+I");
                 }
                 else {
@@ -1880,7 +1880,7 @@ void hLRT2()
             }
         }
         else {
-            if (TestTiequalsTv (JCIG, K80IG) < alpha) {  /*Q*/
+            if (TestTiequalsTv (JCIG, K80IG) < alpha) { /*Q*/
                 if (TestEqualSiteRates (K80I, K80IG) < alpha) { /*R*/
                     if (TestInvariableSites (K80G, K80IG) < alpha) { /*S*/
                         strcpy(modelhLRT2,"K80+I+G");
@@ -1890,7 +1890,7 @@ void hLRT2()
                     }
                 }
                 else {
-                    if (TestInvariableSites (K80, K80I) < alpha) {/*T*/
+                    if (TestInvariableSites (K80, K80I) < alpha) { /*T*/
                         strcpy(modelhLRT2,"K80+I");
                     }
                     else {
@@ -1899,7 +1899,7 @@ void hLRT2()
                 }
             }
             else {
-                if (TestEqualSiteRates (JCI, JCIG) < alpha) {  /*U*/
+                if (TestEqualSiteRates (JCI, JCIG) < alpha) { /*U*/
                     if (TestInvariableSites (JCG, JCIG) < alpha) { /*V*/
                         strcpy(modelhLRT2,"JC+I+G");
                     }
@@ -1908,7 +1908,7 @@ void hLRT2()
                     }
                 }
                 else {
-                    if (TestInvariableSites (JC, JCI) < alpha) {  /*X*/
+                    if (TestInvariableSites (JC, JCI) < alpha) { /*X*/
                         strcpy(modelhLRT2,"JC+I");
                     }
                     else {
@@ -1924,11 +1924,11 @@ void hLRT2()
 /* Performs the hypothesis testing using the hLRT3 hierarchy in Posada & Crandall 2001. */
 void hLRT3()
 {
-    if (TestEqualSiteRates (JC, JCG) < alpha) {   /*A*/
-        if (TestInvariableSites (JCG, JCIG) < alpha) {  /*B*/
-            if (TestTiequalsTv (JCIG, K80IG) < alpha) {  /*C*/
-                if (TestEqualTiAndEqualTvRates (K80IG, SYMIG) < alpha) {  /*D*/
-                    if (TestEqualBaseFrequencies (SYMIG, GTRIG) < alpha) {/*E*/
+    if (TestEqualSiteRates (JC, JCG) < alpha) { /*A*/
+        if (TestInvariableSites (JCG, JCIG) < alpha) { /*B*/
+            if (TestTiequalsTv (JCIG, K80IG) < alpha) { /*C*/
+                if (TestEqualTiAndEqualTvRates (K80IG, SYMIG) < alpha) { /*D*/
+                    if (TestEqualBaseFrequencies (SYMIG, GTRIG) < alpha) { /*E*/
                         strcpy(modelhLRT3,"GTR+I+G");
                     }
                     else {
@@ -1936,7 +1936,7 @@ void hLRT3()
                     }
                 }
                 else {
-                    if (TestEqualBaseFrequencies (K80IG, HKYIG) < alpha) {  /*F*/
+                    if (TestEqualBaseFrequencies (K80IG, HKYIG) < alpha) { /*F*/
                         strcpy(modelhLRT3,"HKY+I+G");
                     }
                     else {
@@ -1983,9 +1983,9 @@ void hLRT3()
         }
     }
     else {
-        if (TestInvariableSites (JC, JCI) < alpha) {   /*M*/
-            if (TestTiequalsTv (JCI, K80I) < alpha) {  /*N*/
-                if (TestEqualTiAndEqualTvRates (K80I, SYMI) < alpha) {  /*O*/
+        if (TestInvariableSites (JC, JCI) < alpha) { /*M*/
+            if (TestTiequalsTv (JCI, K80I) < alpha) { /*N*/
+                if (TestEqualTiAndEqualTvRates (K80I, SYMI) < alpha) { /*O*/
                     if (TestEqualBaseFrequencies (SYMI, GTRI) < alpha) { /*P*/
                         strcpy(modelhLRT3,"GTR+I");
                     }
@@ -2003,7 +2003,7 @@ void hLRT3()
                 }
             }
             else {
-                if (TestEqualBaseFrequencies (JCI, F81I) < alpha) {  /*R*/
+                if (TestEqualBaseFrequencies (JCI, F81I) < alpha) { /*R*/
                     strcpy(modelhLRT3,"F81+I");
                 }
                 else {
@@ -2012,9 +2012,9 @@ void hLRT3()
             }
         }
         else {
-            if (TestTiequalsTv (JC, K80) < alpha) {  /*S*/
+            if (TestTiequalsTv (JC, K80) < alpha) { /*S*/
                 if (TestEqualTiAndEqualTvRates (K80, SYM) < alpha) { /*T*/
-                    if (TestEqualBaseFrequencies (SYM, GTR) < alpha) {  /*U*/
+                    if (TestEqualBaseFrequencies (SYM, GTR) < alpha) { /*U*/
                         strcpy(modelhLRT3,"GTR");
                     }
                     else {
@@ -2022,7 +2022,7 @@ void hLRT3()
                     }
                 }
                 else {
-                    if (TestEqualBaseFrequencies (K80, HKY) < alpha) {  /*V*/
+                    if (TestEqualBaseFrequencies (K80, HKY) < alpha) { /*V*/
                         strcpy(modelhLRT3,"HKY");
                     }
                     else {
@@ -2031,7 +2031,7 @@ void hLRT3()
                 }
             }
             else {
-                if (TestEqualBaseFrequencies (JC, F81) < alpha) {  /*X*/
+                if (TestEqualBaseFrequencies (JC, F81) < alpha) { /*X*/
                     strcpy(modelhLRT3,"F81");
                 }
                 else {
@@ -2046,10 +2046,10 @@ void hLRT3()
 /* Performs the hypothesis testing using the hLRT4 hierarchy in Posada & Crandall 2001. */
 void hLRT4()
 {
-    if (TestEqualSiteRates (GTRI, GTRIG) < alpha) {  /*A*/
-        if (TestInvariableSites (GTRG, GTRIG) < alpha) {  /*B*/
+    if (TestEqualSiteRates (GTRI, GTRIG) < alpha) { /*A*/
+        if (TestInvariableSites (GTRG, GTRIG) < alpha) { /*B*/
             if (TestEqualTiAndEqualTvRates (HKYIG, GTRIG) < alpha) { /*C*/
-                if (TestEqualBaseFrequencies (SYMIG, GTRIG) < alpha) {  /*D*/
+                if (TestEqualBaseFrequencies (SYMIG, GTRIG) < alpha) { /*D*/
                     strcpy(modelhLRT4,"GTR+I+G");
                 }
                 else {
@@ -2076,7 +2076,7 @@ void hLRT4()
             }
         }
         else {
-            if (TestEqualTiAndEqualTvRates (HKYG, GTRG) < alpha) {  /*H*/
+            if (TestEqualTiAndEqualTvRates (HKYG, GTRG) < alpha) { /*H*/
                 if (TestEqualBaseFrequencies (SYMG, GTRG) < alpha) { /*I*/
                     strcpy(modelhLRT4,"GTR+G");
                 }
@@ -2086,7 +2086,7 @@ void hLRT4()
             }
             else {
                 if (TestTiequalsTv (F81G, HKYG) < alpha) { /*J*/
-                    if (TestEqualBaseFrequencies (K80G, HKYG) < alpha) {  /*K*/
+                    if (TestEqualBaseFrequencies (K80G, HKYG) < alpha) { /*K*/
                         strcpy(modelhLRT4,"HKY+G");
                     }
                     else {
@@ -2144,7 +2144,7 @@ void hLRT4()
             }
             else {
                 if (TestTiequalsTv (F81, HKY) < alpha) { /*U*/
-                    if (TestEqualBaseFrequencies (K80, HKY) < alpha) {/*V*/
+                    if (TestEqualBaseFrequencies (K80, HKY) < alpha) { /*V*/
                         strcpy(modelhLRT4,"HKY");
                     }
                     else {
@@ -2152,7 +2152,7 @@ void hLRT4()
                     }
                 }
                 else {
-                    if (TestEqualBaseFrequencies (JC, F81) < alpha) {  /*X*/
+                    if (TestEqualBaseFrequencies (JC, F81) < alpha) { /*X*/
                         strcpy(modelhLRT4,"F81");
                     }
                     else {
@@ -2194,7 +2194,7 @@ static void PrintDate (FILE *fp)
 /************** CheckNA **********************/
 /*
     If value is NA prints "-"
-    
+
 */
 static char *CheckNA (double value)
 {
@@ -2262,7 +2262,7 @@ static void Allocate()
     modelhLRT4 = (char*) calloc (10, sizeof (char));
     modelAIC = (char*) calloc (10, sizeof (char));
     model = (ModelSt*) calloc (NUM_MODELS, sizeof (ModelSt));
-    order = (ModelSt*) calloc (NUM_MODELS, sizeof (ModelSt)); 
+    order = (ModelSt*) calloc (NUM_MODELS, sizeof (ModelSt));
 }
 
 /*********************** Free ***************************/
@@ -2272,8 +2272,8 @@ static void Free()
     free (modelhLRT2);
     free (modelhLRT3);
     free (modelhLRT4);
-    free (modelAIC); 
-    free (model); 
-    free (order); 
+    free (modelAIC);
+    free (model);
+    free (order);
 }
 
