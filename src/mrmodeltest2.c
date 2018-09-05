@@ -1,7 +1,7 @@
 /*
     Title:            MrModeltest2
     Version:          UNIX, MacOSX, Win32
-    Latest changes:   11/03/2016 01:10:12 PM
+    Latest changes:   Tue 04 Sep 2018
     Programmer:       Johan Nylander
                       Uppsala University
                       E-mail: johan.nylander@ebc.uu.se
@@ -20,6 +20,9 @@
                       The settings made by the Prset command was overwritten by the Lset
                       command if issued before the Lset command. Thanks to Ted Schultz.
                       2016-11-02: Took care of some compiler warnings and cleaned the code.
+                      MrModeltest2.4 2018-09: The output from PAUP* changed. MrModeltest2.4
+                      can now only read the new format. Version 2.4 does not report model
+                      averaging output. Thanks to Leila Carmona.
     ===========================================================================
             Below are David's original notes on Modeltest.
     ===========================================================================
@@ -110,7 +113,7 @@
 #define MAX_PROB       0.999999
 #define MIN_PROB       0.000001
 #define PROGRAM_NAME   "MrModeltest"
-#define VERSION_NUMBER "2.3"
+#define VERSION_NUMBER "2.4"
 #define SUCCESS        1
 #define FAILURE        0
 #define YES            1
@@ -141,7 +144,7 @@ static void hLRT3();
 static void hLRT4();
 static void CalculateAIC();
 static void AkaikeWeights ();
-static void AICCalc();
+static int AICCalc();
 static void AICfile();
 static void SetModel(char[]);
 static void Allocate();
@@ -154,11 +157,11 @@ static void PrintMbBlock(int ishLRT);
 static double LRT(ModelSt *model0, ModelSt *model1);
 static double LRTmix(ModelSt *model0, ModelSt *model1);
 static void PrintRunSettings();
-static void ModelAveraging();
-static void AverageEstimates (char *parameter, int numModels, int modelIndex[], int estimateIndex[],
-double *importance, double *averagedEstimate, double minWeightToAverage);
-static double FindMinWeightToAverage ();
-static char *CheckNA (double value);
+/*static void ModelAveraging();*/
+/*static void AverageEstimates (char *parameter, int numModels, int modelIndex[], int estimateIndex[],
+double *importance, double *averagedEstimate, double minWeightToAverage);*/
+/*static double FindMinWeightToAverage ();*/
+/* static char *CheckNA (double value);*/
 float ChiSquare (float x, int);
 float Normalz (float);
 float TestEqualBaseFrequencies(ModelSt *, ModelSt *);
@@ -171,7 +174,7 @@ float TestInvariableSites(ModelSt *, ModelSt *);
 ModelSt *JC, *F81;
 ModelSt *JC, *JCI, *JCG, *JCIG, *F81, *F81I, *F81G, *F81IG, *K80, *K80I, *K80G, *K80IG;
 ModelSt *HKY, *HKYI, *HKYG, *HKYIG, *SYM, *SYMI, *SYMG, *SYMIG, *GTR, *GTRI, *GTRG, *GTRIG;
-float score[168];
+float score[176]; /* Check this length. 175? Previous:: 168 */
 float ln[NUM_MODELS];
 float AIC[NUM_MODELS];
 float wAIC[NUM_MODELS];
@@ -199,13 +202,14 @@ int usehLRT2 = NO;
 int usehLRT3 = NO;
 int usehLRT4 = NO;
 int lastModelConfidence;
-float averagingConfidenceInterval;
+/*float averagingConfidenceInterval;*/
 double cumConfidenceWeight;
 
 /* Parameter estimates for the selected model */
 float fA, fC, fG, fT;
 float TiTv;
-float Ra, Rb, Rc, Rd, Re, Rf;
+/*float Ra, Rb, Rc, Rd, Re, Rf;*/
+float rAC, rAG, rAT, rCG, rCT, rGT;
 float shape;
 float pinv;
 float theln;
@@ -222,7 +226,7 @@ int main(int argc, char **argv)
     sampleSize = 0;
     useBL = NO;                        /* by default do not include branch length estimates as parameters */
     useAICc = NO;                      /* by default do not use the AICc correction */
-    averagingConfidenceInterval = 1.0; /* by default include all models in model-averaged estimates */
+    /*averagingConfidenceInterval = 1.0;*/ /* by default include all models in model-averaged estimates */
 
     start = clock();
     ReadArgs(argc, argv);
@@ -334,7 +338,7 @@ int main(int argc, char **argv)
         printf("\n AIC model = %s", modelAIC);
     }
     AkaikeWeights();
-    ModelAveraging();
+    /*ModelAveraging();*/
     secs = (double)(clock() - start) / CLOCKS_PER_SEC;
     Free();
     printf("\n\n_________________________________________________________________________");
@@ -452,17 +456,17 @@ static void ReadArgs(int argc,char **argv)
             fprintf(stderr,"%s version %s\n",PROGRAM_NAME, VERSION_NUMBER);
             exit(1);
             break;
-        case 'w':
-            averagingConfidenceInterval = atof(argv[i]);
-            if (averagingConfidenceInterval > 1) {
-                fprintf (stderr, "\nError: confidence interval cannot be > 1");
-                exit (1);
-            }
-            else if (averagingConfidenceInterval <= 0) {
-                fprintf (stderr, "\nError: confidence interval cannot be <= 0");
-                exit (1);
-            }
-            break;
+//        case 'w':
+//            averagingConfidenceInterval = atof(argv[i]);
+//            if (averagingConfidenceInterval > 1) {
+//                fprintf (stderr, "\nError: confidence interval cannot be > 1");
+//                exit (1);
+//            }
+//            else if (averagingConfidenceInterval <= 0) {
+//                fprintf (stderr, "\nError: confidence interval cannot be <= 0");
+//                exit (1);
+//            }
+//            break;
         default:
             fprintf(stderr,"Unknown argument on the command line '%c'\n",flag);
             exit(1);
@@ -541,7 +545,7 @@ static void ReadPaupScores()
         printf("\n\n");
     }
     for (j = 0; j < NUM_MODELS; j++) {
-        if (model[j].ln == 0 || i < 167) { /*Att göra: kolla detta värde! Ev 166. */
+        if (model[j].ln == 0 || i < 175) { /*Att göra: kolla detta värde! Ev 175. */
             printf("\n\nThe input file is incomplete or incorrect. \nAre you using the most updated block of PAUP* commands?. ");
             printf("\nThis version of MrModeltest is not compatible with versions of PAUP* older than PAUP*4.0beta3");
             printf("\nCheck the Modeltest and PAUP* web pages");
@@ -551,32 +555,34 @@ static void ReadPaupScores()
 }
 
 /************** Initialize. Modified by Johan 2002-03-18 **********************/
+/* New versions of paup (at least year 2018) prints a different output.*/
+/* Last edits Tue 04 Sep 2018 02:42:12 PM CEST */
 void Initialize()
 {
-    JC =     model;      model[0].ln = order[0].ln = score[1];
-    JCI =    model + 1;  model[1].ln = order[1].ln = score[3];
-    JCG =    model + 2;  model[2].ln = order[2].ln = score[6];
-    JCIG =   model + 3;  model[3].ln = order[3].ln = score[9];
-    F81 =    model + 4;  model[4].ln = order[4].ln = score[13];
-    F81I =   model + 5;  model[5].ln = order[5].ln = score[19];
-    F81G =   model + 6;  model[6].ln = order[6].ln = score[26];
-    F81IG =  model + 7;  model[7].ln = order[7].ln = score[33];
-    K80 =    model + 8;  model[8].ln = order[8].ln = score[41];
-    K80I =   model + 9;  model[9].ln = order[9].ln = score[44];
-    K80G =   model + 10; model[10].ln = order[10].ln = score[48];
-    K80IG =  model + 11; model[11].ln = order[11].ln = score[52];
-    HKY =    model + 12; model[12].ln = order[12].ln = score[57];
-    HKYI =   model + 13; model[13].ln = order[13].ln = score[64];
-    HKYG =   model + 14; model[14].ln = order[14].ln = score[72];
-    HKYIG =  model + 15; model[15].ln = order[15].ln = score[80];
-    SYM =    model + 16; model[16].ln = order[16].ln = score[89];
-    SYMI =   model + 17; model[17].ln = order[17].ln = score[96];
-    SYMG =   model + 18; model[18].ln = order[18].ln = score[104];
-    SYMIG =  model + 19; model[19].ln = order[19].ln = score[112];
-    GTR =    model + 20; model[20].ln = order[20].ln = score[121];
-    GTRI =   model + 21; model[21].ln = order[21].ln = score[132];
-    GTRG =   model + 22; model[22].ln = order[22].ln = score[144];
-    GTRIG =  model + 23; model[23].ln = order[23].ln = score[156];
+    JC =     model;      model[0].ln = order[0].ln = score[1]; /*1*/
+    JCI =    model + 1;  model[1].ln = order[1].ln = score[3]; /*3*/
+    JCG =    model + 2;  model[2].ln = order[2].ln = score[6]; /*6*/
+    JCIG =   model + 3;  model[3].ln = order[3].ln = score[9]; /*9*/
+    F81 =    model + 4;  model[4].ln = order[4].ln = score[13]; /*13*/
+    F81I =   model + 5;  model[5].ln = order[5].ln = score[19]; /*19*/
+    F81G =   model + 6;  model[6].ln = order[6].ln = score[26]; /*26*/
+    F81IG =  model + 7;  model[7].ln = order[7].ln = score[33]; /*33*/
+    K80 =    model + 8;  model[8].ln = order[8].ln = score[41]; /*41*/
+    K80I =   model + 9;  model[9].ln = order[9].ln = score[44]; /*44*/
+    K80G =   model + 10; model[10].ln = order[10].ln = score[48]; /*48*/
+    K80IG =  model + 11; model[11].ln = order[11].ln = score[52]; /*52*/
+    HKY =    model + 12; model[12].ln = order[12].ln = score[57]; /*57*/
+    HKYI =   model + 13; model[13].ln = order[13].ln = score[64]; /*64*/
+    HKYG =   model + 14; model[14].ln = order[14].ln = score[72]; /*72*/
+    HKYIG =  model + 15; model[15].ln = order[15].ln = score[80]; /*80*/
+    SYM =    model + 16; model[16].ln = order[16].ln = score[89]; /*89*/
+    SYMI =   model + 17; model[17].ln = order[17].ln = score[97]; /*96*/
+    SYMG =   model + 18; model[18].ln = order[18].ln = score[106]; /*104*/
+    SYMIG =  model + 19; model[19].ln = order[19].ln = score[115]; /*112*/
+    GTR =    model + 20; model[20].ln = order[20].ln = score[125]; /*121*/
+    GTRI =   model + 21; model[21].ln = order[21].ln = score[137]; /*132*/
+    GTRG =   model + 22; model[22].ln = order[22].ln = score[150]; /*144*/
+    GTRIG =  model + 23; model[23].ln = order[23].ln = score[163]; /*156*/
     /* free parameters */
     /* JC */
     model[0].parameters = order[0].parameters = 0;
@@ -674,7 +680,7 @@ static void ReadScores()
     }
     Initialize();
     for (j = 0; j < NUM_MODELS; j++) {
-        if (model[j].ln == 0 || i < 167) {
+        if (model[j].ln == 0 || i < 175) {
             printf("\n\nThe input file is incomplete or incorrect. \nAre you using the most updated block of PAUP* commands?.\n ");
             exit(0);
         }
@@ -686,7 +692,7 @@ static void ReadScores()
 }
 
 /******************* LRT ******************************/
-/* peforms a likelihood ratio test */
+/* performs a likelihood ratio test */
 static double LRT(ModelSt *model0, ModelSt *model1)
 {
     double delta;
@@ -717,7 +723,7 @@ static double LRT(ModelSt *model0, ModelSt *model1)
 }
 
 /******************* LRTmix ******************************/
-/* peforms a likelihood ratio test and uses mixed chi2*/
+/* performs a likelihood ratio test and uses mixed chi2*/
 static double LRTmix(ModelSt *model0, ModelSt *model1)
 {
     double delta, prob;
@@ -1049,171 +1055,173 @@ void AkaikeWeights ()
     printf ("\n cumWeight:\tcumulative Akaike weight");
 }
 
-/************** ModelAveraging **********************/
-/*  Calculates the importance for different parameters
-    of the models (it is simply the sum of the Akaike
-    weights for those models that include such parameter)
-    and model averaged estimates
+// /************** ModelAveraging **********************/
+// /*  Calculates the importance for different parameters
+//     of the models (it is simply the sum of the Akaike
+//     weights for those models that include such parameter)
+//     and model averaged estimates
+// 
+//     This method is completely brute force (See Java version)
+// 
+//     Assumes TrN y TIM estimate only Rb, Re
+//     K81 estimates no R parameter
+//     TVM estimates only Ra, Rc, Rd
+//     GTR y SIM estimate Ra, Rb, Rc, Rd, Re
+// */
+// 
+// 
+// void ModelAveraging()
+// {
+//     double minWeightToAverage;
+//     double ifA, ifC, ifG, ifT, ititv, iRa, iRb, iRc, iRd, iRe, ipinvI, ialphaG, ipinvIG, ialphaIG;
+//     double wfA, wfC, wfG, wfT, wtitv, wRa, wRb, wRc, wRd, wRe, wpinvI, walphaG, wpinvIG, walphaIG;
+// 
+//     /* which index (1-167) for scores */
+//     int efA[] = {14,20,27,34,58,65,73,81,122,133,145,157};
+//     int efC[] = {15,21,28,35,59,66,74,82,123,134,146,158};
+//     int efG[] = {16,22,29,36,60,67,75,83,124,135,147,159};
+//     int efT[] = {17,23,30,37,61,68,76,84,125,136,148,160};
+//     int etitv[] = {42,45,49,53,62,69,77,85};
+//     int eRa[] = {90,97,105,113,126,137,149,161};
+//     int eRb[] = {91,98,106,114,127,138,150,162};
+//     int eRc[] = {92,99,107,115,128,139,151,163};
+//     int eRd[] = {93,100,108,116,129,140,152,164};
+//     int eRe[] = {94,101,109,117,130,141,153,165};
+//     int epinvI[] = {4,24,46,70,102,142};
+//     int ealphaG[] = {7,31,50,78,110,154};
+//     int epinvIG[] = {4,10,24,38,46,54,70,86,102,118,142,166};
+//     int ealphaIG[] = {7,11,31,39,50,55,78,87,110,119,154,167};
+// 
+//     /* which index (1-23) for models containing the parameter  */
+//     int mfA[] = {4,5,6,7,12,13,14,15,20,21,22,23};
+//     int mfC[] = {4,5,6,7,12,13,14,15,20,21,22,23};
+//     int mfG[] = {4,5,6,7,12,13,14,15,20,21,22,23};
+//     int mfT[] = {4,5,6,7,12,13,14,15,20,21,22,23};
+//     int mtitv[] = {8,9,10,11,12,13,14,15};
+//     int mRa[] = {16,17,18,19,20,21,22,23};
+//     int mRb[] = {16,17,18,19,20,21,22,23};
+//     int mRc[] = {16,17,18,19,20,21,22,23};
+//     int mRd[] = {16,17,18,19,20,21,22,23};
+//     int mRe[] = {16,17,18,19,20,21,22,23};
+//     int mpinvI[] = {1,5,9,13,17,21};
+//     int malphaG[] = {2,6,10,14,18,22};
+//     int mpinvIG[] = {1,3,5,7,9,11,13,15,17,19,21,23};
+//     int malphaIG[] = {2,3,6,7,10,11,14,15,18,19,22,23};
+// 
+//     ifA = ifC = ifG = ifT = ititv = iRa = iRb = iRc = iRd = iRe = ipinvI = ialphaG = ipinvIG = ialphaIG = 0;
+//     wfA = wfC = wfG = wfT = wtitv = wRa = wRb = wRc = wRd = wRe = wpinvI = walphaG = wpinvIG = walphaIG = 0;
+// 
+//     if (averagingConfidenceInterval < 1) {
+//         minWeightToAverage = FindMinWeightToAverage ();
+//     }
+//     else {
+//         minWeightToAverage = 0.0;
+//         cumConfidenceWeight = 1.0;
+//     }
+// 
+//     /* calculate importances and model-averaged estimates */
+//     AverageEstimates ("fA",12, mfA, efA, &ifA, &wfA, minWeightToAverage);
+//     AverageEstimates ("fC",12, mfC, efC, &ifC, &wfC, minWeightToAverage);
+//     AverageEstimates ("fG",12, mfG, efG, &ifG, &wfG, minWeightToAverage);
+//     AverageEstimates ("fT",12, mfT, efT, &ifT, &wfT, minWeightToAverage);
+//     AverageEstimates ("titv", 8, mtitv, etitv, &ititv, &wtitv, minWeightToAverage);
+//     AverageEstimates ("Ra",8, mRa, eRa, &iRa, &wRa, minWeightToAverage);
+//     AverageEstimates ("Rb",8, mRb, eRb, &iRb, &wRb, minWeightToAverage);
+//     AverageEstimates ("Rc",8, mRc, eRc, &iRc, &wRc, minWeightToAverage);
+//     AverageEstimates ("Rd",8, mRd, eRd, &iRd, &wRd, minWeightToAverage);
+//     AverageEstimates ("Re",8, mRe, eRe, &iRe, &wRe, minWeightToAverage);
+//     AverageEstimates ("pinv(I)",6, mpinvI, epinvI, &ipinvI, &wpinvI, minWeightToAverage);
+//     AverageEstimates ("alpha(G)",6, malphaG, ealphaG, &ialphaG, &walphaG, minWeightToAverage);
+//     AverageEstimates ("pinv(IG)",12, mpinvIG, epinvIG, &ipinvIG, &wpinvIG, minWeightToAverage);
+//     AverageEstimates ("alpha(IG)",12, malphaIG, ealphaIG, &ialphaIG, &walphaIG, minWeightToAverage);
+// 
+//     /* print results */
+//     printf ("\n\n\n\n* MODEL AVERAGING AND PARAMETER IMPORTANCE (using Akaike Weights)");
+//     if (averagingConfidenceInterval == 1) {
+//         fprintf (stdout, "\n  Including all %d models", NUM_MODELS);
+//     }
+//     else {
+//         fprintf (stdout, "\n    Including only the best %d models within the aproximate %4.2f (%6.4f)\n    confidence interval", lastModelConfidence+1, averagingConfidenceInterval, cumConfidenceWeight);
+//         fprintf (stdout, "\n      minimum weight to average is %6.4f", minWeightToAverage);
+//         fprintf (stdout, "\n      weights are reescaled by the interval cumulative weight (%6.4f)", cumConfidenceWeight);
+//     }
+// 
+//     printf ("\n\n\t\t\t\t\tModel-averaged");    /*Att göra: fixa till output för printet nedan*/
+//     printf ("\nParameter\t\tImportance\testimates");
+//     printf ("\n----------------------------------------------------");
+//     printf ("\nfA\t\t\t%6.4f\t\t%11s",ifA, CheckNA(wfA));
+//     printf ("\nfC\t\t\t%6.4f\t\t%11s",ifC, CheckNA(wfC));
+//     printf ("\nfG\t\t\t%6.4f\t\t%11s",ifG, CheckNA(wfG));
+//     printf ("\nfT\t\t\t%6.4f\t\t%11s",ifT, CheckNA(wfT));
+//     printf ("\nTiTv\t\t\t%6.4f\t\t%11s",ititv, CheckNA(wtitv));
+//     printf ("\nrAC\t\t\t%6.4f\t\t%11s",iRa, CheckNA(wRa));
+//     printf ("\nrAG\t\t\t%6.4f\t\t%11s",iRb, CheckNA(wRb));
+//     printf ("\nrAT\t\t\t%6.4f\t\t%11s",iRc, CheckNA(wRc));
+//     printf ("\nrCG\t\t\t%6.4f\t\t%11s",iRd, CheckNA(wRd));
+//     printf ("\nrCT\t\t\t%6.4f\t\t%11s",iRe, CheckNA(wRe));
+//     printf ("\npinv(I)\t\t\t%6.4f\t\t%11s",ipinvI, CheckNA(wpinvI));
+//     printf ("\nalpha(G)\t\t%6.4f\t\t%11s",ialphaG, CheckNA(walphaG));
+//     printf ("\npinv(I+IG)\t\t%6.4f\t\t%11s",ipinvIG, CheckNA(wpinvIG));
+//     printf ("\nalpha(G+IG)\t\t%6.4f\t\t%11s",ialphaIG, CheckNA(walphaIG));
+//     printf ("\n----------------------------------------------------");
+// 
+//     printf ("\nNote: values have been rounded.");
+//     printf ("\n (I):\t\taveraged using only +I models");
+//     printf ("\n (G):\t\taveraged using only +G models");
+//     printf ("\n (I+IG):\taveraged using both +I and +I+G models");
+//     printf ("\n (G+IG):\taveraged using both +G and +I+G models");
+// 
+// }
 
-    This method is completely brute force (See Java version)
 
-    Assumes TrN y TIM estimate only Rb, Re
-    K81 estimates no R parameter
-    TVM estimates only Ra, Rc, Rd
-    GTR y SIM estimate Ra, Rb, Rc, Rd, Re
-*/
-
-void ModelAveraging()
-{
-    double minWeightToAverage;
-    double ifA, ifC, ifG, ifT, ititv, iRa, iRb, iRc, iRd, iRe, ipinvI, ialphaG, ipinvIG, ialphaIG;
-    double wfA, wfC, wfG, wfT, wtitv, wRa, wRb, wRc, wRd, wRe, wpinvI, walphaG, wpinvIG, walphaIG;
-
-    /* which index (1-167) for scores */
-    int efA[] = {14,20,27,34,58,65,73,81,122,133,145,157};
-    int efC[] = {15,21,28,35,59,66,74,82,123,134,146,158};
-    int efG[] = {16,22,29,36,60,67,75,83,124,135,147,159};
-    int efT[] = {17,23,30,37,61,68,76,84,125,136,148,160};
-    int etitv[] = {42,45,49,53,62,69,77,85};
-    int eRa[] = {90,97,105,113,126,137,149,161};
-    int eRb[] = {91,98,106,114,127,138,150,162};
-    int eRc[] = {92,99,107,115,128,139,151,163};
-    int eRd[] = {93,100,108,116,129,140,152,164};
-    int eRe[] = {94,101,109,117,130,141,153,165};
-    int epinvI[] = {4,24,46,70,102,142};
-    int ealphaG[] = {7,31,50,78,110,154};
-    int epinvIG[] = {4,10,24,38,46,54,70,86,102,118,142,166};
-    int ealphaIG[] = {7,11,31,39,50,55,78,87,110,119,154,167};
-
-    /* which index (1-23) for models containing the parameter  */
-    int mfA[] = {4,5,6,7,12,13,14,15,20,21,22,23};
-    int mfC[] = {4,5,6,7,12,13,14,15,20,21,22,23};
-    int mfG[] = {4,5,6,7,12,13,14,15,20,21,22,23};
-    int mfT[] = {4,5,6,7,12,13,14,15,20,21,22,23};
-    int mtitv[] = {8,9,10,11,12,13,14,15};
-    int mRa[] = {16,17,18,19,20,21,22,23};
-    int mRb[] = {16,17,18,19,20,21,22,23};
-    int mRc[] = {16,17,18,19,20,21,22,23};
-    int mRd[] = {16,17,18,19,20,21,22,23};
-    int mRe[] = {16,17,18,19,20,21,22,23};
-    int mpinvI[] = {1,5,9,13,17,21};
-    int malphaG[] = {2,6,10,14,18,22};
-    int mpinvIG[] = {1,3,5,7,9,11,13,15,17,19,21,23};
-    int malphaIG[] = {2,3,6,7,10,11,14,15,18,19,22,23};
-
-    ifA = ifC = ifG = ifT = ititv = iRa = iRb = iRc = iRd = iRe = ipinvI = ialphaG = ipinvIG = ialphaIG = 0;
-    wfA = wfC = wfG = wfT = wtitv = wRa = wRb = wRc = wRd = wRe = wpinvI = walphaG = wpinvIG = walphaIG = 0;
-
-    if (averagingConfidenceInterval < 1) {
-        minWeightToAverage = FindMinWeightToAverage ();
-    }
-    else {
-        minWeightToAverage = 0.0;
-        cumConfidenceWeight = 1.0;
-    }
-
-    /* calculate importances and model-averaged estimates */
-    AverageEstimates ("fA",12, mfA, efA, &ifA, &wfA, minWeightToAverage);
-    AverageEstimates ("fC",12, mfC, efC, &ifC, &wfC, minWeightToAverage);
-    AverageEstimates ("fG",12, mfG, efG, &ifG, &wfG, minWeightToAverage);
-    AverageEstimates ("fT",12, mfT, efT, &ifT, &wfT, minWeightToAverage);
-    AverageEstimates ("titv", 8, mtitv, etitv, &ititv, &wtitv, minWeightToAverage);
-    AverageEstimates ("Ra",8, mRa, eRa, &iRa, &wRa, minWeightToAverage);
-    AverageEstimates ("Rb",8, mRb, eRb, &iRb, &wRb, minWeightToAverage);
-    AverageEstimates ("Rc",8, mRc, eRc, &iRc, &wRc, minWeightToAverage);
-    AverageEstimates ("Rd",8, mRd, eRd, &iRd, &wRd, minWeightToAverage);
-    AverageEstimates ("Re",8, mRe, eRe, &iRe, &wRe, minWeightToAverage);
-    AverageEstimates ("pinv(I)",6, mpinvI, epinvI, &ipinvI, &wpinvI, minWeightToAverage);
-    AverageEstimates ("alpha(G)",6, malphaG, ealphaG, &ialphaG, &walphaG, minWeightToAverage);
-    AverageEstimates ("pinv(IG)",12, mpinvIG, epinvIG, &ipinvIG, &wpinvIG, minWeightToAverage);
-    AverageEstimates ("alpha(IG)",12, malphaIG, ealphaIG, &ialphaIG, &walphaIG, minWeightToAverage);
-
-    /* print results */
-    printf ("\n\n\n\n* MODEL AVERAGING AND PARAMETER IMPORTANCE (using Akaike Weights)");
-    if (averagingConfidenceInterval == 1) {
-        fprintf (stdout, "\n  Including all %d models", NUM_MODELS);
-    }
-    else {
-        fprintf (stdout, "\n    Including only the best %d models within the aproximate %4.2f (%6.4f)\n    confidence interval", lastModelConfidence+1, averagingConfidenceInterval, cumConfidenceWeight);
-        fprintf (stdout, "\n      minimum weight to average is %6.4f", minWeightToAverage);
-        fprintf (stdout, "\n      weights are reescaled by the interval cumulative weight (%6.4f)", cumConfidenceWeight);
-    }
-
-    printf ("\n\n\t\t\t\t\tModel-averaged");    /*Att göra: fixa till output för printet nedan*/
-    printf ("\nParameter\t\tImportance\testimates");
-    printf ("\n----------------------------------------------------");
-    printf ("\nfA\t\t\t%6.4f\t\t%11s",ifA, CheckNA(wfA));
-    printf ("\nfC\t\t\t%6.4f\t\t%11s",ifC, CheckNA(wfC));
-    printf ("\nfG\t\t\t%6.4f\t\t%11s",ifG, CheckNA(wfG));
-    printf ("\nfT\t\t\t%6.4f\t\t%11s",ifT, CheckNA(wfT));
-    printf ("\nTiTv\t\t\t%6.4f\t\t%11s",ititv, CheckNA(wtitv));
-    printf ("\nrAC\t\t\t%6.4f\t\t%11s",iRa, CheckNA(wRa));
-    printf ("\nrAG\t\t\t%6.4f\t\t%11s",iRb, CheckNA(wRb));
-    printf ("\nrAT\t\t\t%6.4f\t\t%11s",iRc, CheckNA(wRc));
-    printf ("\nrCG\t\t\t%6.4f\t\t%11s",iRd, CheckNA(wRd));
-    printf ("\nrCT\t\t\t%6.4f\t\t%11s",iRe, CheckNA(wRe));
-    printf ("\npinv(I)\t\t\t%6.4f\t\t%11s",ipinvI, CheckNA(wpinvI));
-    printf ("\nalpha(G)\t\t%6.4f\t\t%11s",ialphaG, CheckNA(walphaG));
-    printf ("\npinv(I+IG)\t\t%6.4f\t\t%11s",ipinvIG, CheckNA(wpinvIG));
-    printf ("\nalpha(G+IG)\t\t%6.4f\t\t%11s",ialphaIG, CheckNA(walphaIG));
-    printf ("\n----------------------------------------------------");
-
-    printf ("\nNote: values have been rounded.");
-    printf ("\n (I):\t\taveraged using only +I models");
-    printf ("\n (G):\t\taveraged using only +G models");
-    printf ("\n (I+IG):\taveraged using both +I and +I+G models");
-    printf ("\n (G+IG):\taveraged using both +G and +I+G models");
-
-}
-
-/************** AverageEstimates **********************/
-/*
-    Calculates parameter importance and averaged estimates
-*/
-void AverageEstimates (char *whichParameter, int numModels, int *modelIndex, int *estimateIndex, double *importance, double *averagedEstimate, double minWeightToAverage)
-{
-    int i;
-
-    whichParameter = whichParameter; /* just to avoid warnings */
-    for (i=0; i < numModels; i++) {
-        if (wAIC[modelIndex[i]] < minWeightToAverage) {
-            continue;
-        }
-        *importance += wAIC[modelIndex[i]];
-        *averagedEstimate += wAIC[modelIndex[i]] * score[estimateIndex[i]];
-    }
-    /* rescale importance to the total weight of the models included in the confidence interval */
-    if (*importance  > 0) {
-        *averagedEstimate /= *importance;
-        *importance /= cumConfidenceWeight;
-    }
-    else {
-        *averagedEstimate = NA;
-    }
-}
-
-/*********************** FindMinWeightToAverage ****************************/
-/*
-    Finds the minimum weight we want to average, that is the weight corresponding
-    to the last model in the confidence interval specified
-*/
-double FindMinWeightToAverage ()
-{
-    int i;
-    double minWeight,cumWeight;
-
-    cumWeight = 0;
-    for (i = 0; i < NUM_MODELS; i++) {
-        cumWeight += wAIC[orderedAIC[i]];
-        if (cumWeight > averagingConfidenceInterval) {
-            minWeight = wAIC[orderedAIC[i]];
-            lastModelConfidence = i;
-            cumConfidenceWeight = cumWeight;
-            break;
-        }
-    }
-    return minWeight;
-}
+// /************** AverageEstimates **********************/
+// /*
+//     Calculates parameter importance and averaged estimates
+// */
+// void AverageEstimates (char *whichParameter, int numModels, int *modelIndex, int *estimateIndex, double *importance, double *averagedEstimate, double minWeightToAverage)
+// {
+//     int i;
+// 
+//     whichParameter = whichParameter; /* just to avoid warnings */
+//     for (i=0; i < numModels; i++) {
+//         if (wAIC[modelIndex[i]] < minWeightToAverage) {
+//             continue;
+//         }
+//         *importance += wAIC[modelIndex[i]];
+//         *averagedEstimate += wAIC[modelIndex[i]] * score[estimateIndex[i]];
+//     }
+//     /* rescale importance to the total weight of the models included in the confidence interval */
+//     if (*importance  > 0) {
+//         *averagedEstimate /= *importance;
+//         *importance /= cumConfidenceWeight;
+//     }
+//     else {
+//         *averagedEstimate = NA;
+//     }
+// }
+// 
+// /*********************** FindMinWeightToAverage ****************************/
+// /*
+//     Finds the minimum weight we want to average, that is the weight corresponding
+//     to the last model in the confidence interval specified
+// */
+// double FindMinWeightToAverage ()
+// {
+//     int i;
+//     double minWeight,cumWeight;
+// 
+//     cumWeight = 0;
+//     for (i = 0; i < NUM_MODELS; i++) {
+//         cumWeight += wAIC[orderedAIC[i]];
+//         if (cumWeight > averagingConfidenceInterval) {
+//             minWeight = wAIC[orderedAIC[i]];
+//             lastModelConfidence = i;
+//             cumConfidenceWeight = cumWeight;
+//             break;
+//         }
+//     }
+//     return minWeight;
+// }
 
 /*********************** AICfile ****************************/
 /* reads likelihood scores from a file and calculates their AIC */
@@ -1255,46 +1263,115 @@ void AICfile()
 /*********************** AICCalc ***************************/
 /*Ask the user for likelihood scores and calculates their AIC */
 /*values, choosing the minimum. */
-void AICCalc()
+//void AICCalc()
+//{
+//    double ln[300];
+//    int n[300];
+//    double AIC[300];
+//    double min_AIC;
+//    int i, number;
+//
+//    printf("\nEnter the number of likelihood scores you want to compare> ");
+//    scanf("%d", &number);
+//    for (i = 1; i <= number; i++) {
+//        printf("\nEnter the positive likelihood score number %d> ", i);
+//        scanf("%lf", &ln[i]);
+//        printf("\nEnter the number of free parameters corresponding to the model \nrepresented by the score number %d> ", i);
+//        scanf("%d", &n[i]);
+//        if (ln[i] < 0 || n[i] < 0 || ln[i] == 0 || n[i] == 0) {
+//            printf("\nThe program only admits positive likelihood scores or number of parameters.");
+//            printf("\nEnter the positive likelihood score number %d", i);
+//            scanf("%lf", &ln[i]);
+//        }
+//        AIC[i] = 2*(ln[i] + n[i]);
+//    }
+//    min_AIC = AIC[1];
+//    for (i = 1; i <= number; i++) {
+//        if (AIC[i] <= min_AIC) {
+//            min_AIC = AIC[i];
+//        }
+//    }
+//    printf("\n\n_________________________ Results of AIC Calculator _______________________\n");
+//    printf("\nNumber\t\tLikelihood\t\tParameters\t\tAIC\n");
+//    for (i = 1; i <= number; i++) {
+//        printf("%2d\t%15.5f\t%5d\t%15.5f\n", i, ln[i], n[i], AIC[i]);
+//    }
+//    for (i = 1; i <= number; i++) {
+//        if (AIC[i] == min_AIC) {
+//            printf("\n A minimum AIC value (%f) corresponds to the score number %d (%f)\n",  min_AIC, i, ln[i]);
+//        }
+//    }
+//    printf("\nDone.\n");
+//    exit(0);
+//}
+int AICCalc()
 {
+
     double ln[300];
     int n[300];
     double AIC[300];
-    double min_AIC;
+    int min_AIC;
     int i, number;
 
-    printf("\nEnter the number of likelihood scores you want to compare> ");
-    scanf("%d", &number);
-    for (i = 1; i <= number; i++) {
-        printf("\nEnter the positive likelihood score number %d> ", i);
-        scanf("%lf", &ln[i]);
-        printf("\nEnter the number of free parameters corresponding to the model \nrepresented by the score number %d> ", i);
-        scanf("%d", &n[i]);
-        if (ln[i] < 0 || n[i] < 0 || ln[i] == 0 || n[i] == 0) {
-            printf("\nThe program only admits positive likelihood scores or number of parameters.");
-            printf("\nEnter the positive likelihood score number %d", i);
-            scanf("%lf", &ln[i]);
+    while (1) {
+        fprintf(stderr,
+            "Enter the number of likelihood scores you want to compare> ");
+        if (scanf("%d", &number) != 1) {
+            perror("Error in scanf() call");
+            exit(EXIT_FAILURE);
         }
-        AIC[i] = 2*(ln[i] + n[i]);
+        else if (number > 0 && number < 300) {
+            break;
+        }
+        fprintf(stderr, "Invalid number, must be 1 or larger (but not as large as 300)\n");
     }
-    min_AIC = AIC[1];
-    for (i = 1; i <= number; i++) {
-        if (AIC[i] <= min_AIC) {
-            min_AIC = AIC[i];
+    for (i = 0; i < number; i++) {
+        putchar('\n');
+        fprintf(stderr, "Enter the positive likelihood score number %d> ", i + 1);
+        if (scanf("%lf", &ln[i]) != 1) {
+            perror("Error in scanf()");
+            exit(EXIT_FAILURE);
+        }
+        fprintf(stderr,
+            "Enter the number of free parameters corresponding to the model "
+            "\nrepresented by the score number %d> ",
+            i + 1);
+        if (scanf("%d", &n[i]) != 1) {
+            perror("Error in scanf()");
+            exit(EXIT_FAILURE);
+        }
+        if (ln[i] <= 0 || n[i] <= 0) {
+            fputs("The program only admits positive likelihood scores or number "
+                "of parameters\n",
+                stderr);
+            fprintf(stderr, "Enter the positive likelihood score number %d", i + 1);
+        if (scanf("%lf", &ln[i]) != 1) {
+            perror("Error in scanf()");
+            exit(EXIT_FAILURE);
+            }
+        }
+        AIC[i] = 2 * (ln[i] + n[i]);
+    }
+    min_AIC = 0;
+    for (i = 1; i < number; i++) {
+        if (AIC[i] < AIC[min_AIC]) {
+            min_AIC = i;
         }
     }
-    printf("\n\n_________________________ Results of AIC Calculator _______________________\n");
-    printf("\nNumber\t\tLikelihood\t\tParameters\t\tAIC\n");
-    for (i = 1; i <= number; i++) {
-        printf("%2d\t%15.5f\t%5d\t%15.5f\n", i, ln[i], n[i], AIC[i]);
+    puts("\n");
+    puts("_________________________ "
+        "Results of AIC Calculator "
+        "_______________________");
+    puts("\nNumber\t\tLikelihood\t\tParameters\t\tAIC");
+    for (i = 0; i < number; i++) {
+        printf("%2d\t%15.5f\t%5d\t%15.5f\n", i + 1, ln[i], n[i], AIC[i]);
     }
-    for (i = 1; i <= number; i++) {
-        if (AIC[i] == min_AIC) {
-            printf("\n A minimum AIC value (%f) corresponds to the score number %d (%f)\n",  min_AIC, i, ln[i]);
-        }
-    }
-    printf("\nDone.\n");
-    exit(0);
+    printf("\n A minimum AIC value (%f) corresponds to the score number %d "
+        "(%f)\n",
+        AIC[min_AIC], min_AIC + 1, ln[min_AIC]);
+    puts("\nDone.");
+
+    return EXIT_SUCCESS;
 }
 
 /********************* PrintPaupBlock ************************/
@@ -1324,14 +1401,16 @@ static void PrintPaupBlock (int ishLRT)
         printf("(%.4f %.4f %.4f)",fA,fC,fG);
     }
     /* Substitution rates */
-    if (Ra == Rb && Ra == Rc && Ra == Rd && Ra == Re && Ra == Rf && TiTv == 0) {
+    /*if (Ra == Rb && Ra == Rc && Ra == Rd && Ra == Re && Ra == Rf && TiTv == 0) {*/
+    if (rAC == rAG && rAC == rAT && rAC == rCG && rAC == rCT && rAC == rGT && TiTv == 0) {
         printf("  Nst=1");
     }
     else if (TiTv != 0) {
         printf("  Nst=2  TRatio=%.4f", TiTv);
     }
     else {
-        printf("  Nst=6  Rmat=(%.9f %.9f %.9f %.9f %.9f)", Ra, Rb, Rc, Rd, Re);
+        /*printf("  Nst=6  Rmat=(%.9f %.9f %.9f %.9f %.9f)", Ra, Rb, Rc, Rd, Re);*/
+        printf("  Nst=6  Rmat=(%.9f %.9f %.9f %.9f %.9f)", rAC, rAG, rAT, rCG, rCT);
     }
     /* Rate variation */
     printf("  Rates=");
@@ -1377,7 +1456,8 @@ static void PrintMbBlock (int ishLRT)
     printf("\nBEGIN MRBAYES;\n");
     printf("\n\tLset");
     /* Substitution rates */
-    if (Ra == Rb && Ra == Rc && Ra == Rd && Ra == Re && Ra == Rf && TiTv == 0) {
+    /*if (Ra == Rb && Ra == Rc && Ra == Rd && Ra == Re && Ra == Rf && TiTv == 0) {*/
+    if (rAC == rAG && rAC == rAT && rAC == rCG && rAC == rCT && rAC == rGT && TiTv == 0) {
         printf("  nst=1");
     }
     else if (TiTv != 0) { /*** Att göra: Monitor this. Might be "yes" also for nst=6! **/
@@ -1464,7 +1544,8 @@ static void Output(char *selection, float value)
         printf("\n     freqT = \t%7.4f", fT);
     }
     printf("\n   Substitution model: ");
-    if (Ra == Rb && Ra == Rc && Ra == Rd && Ra == Re && Ra == Rf && TiTv == 0) {
+    /*if (Ra == Rb && Ra == Rc && Ra == Rd && Ra == Re && Ra == Rf && TiTv == 0) {*/
+    if (rAC == rAG && rAC == rAT && rAC == rCG && rAC == rCT && rAC == rGT && TiTv == 0) {
         printf("\n     All rates equal");
     }
     else if (TiTv != 0) {
@@ -1472,12 +1553,18 @@ static void Output(char *selection, float value)
     }
     else {
         printf("\n     Rate matrix");
-        printf("\n     R(a) [A-C] = \t%7.4f", Ra);
-        printf("\n     R(b) [A-G] = \t%7.4f", Rb);
-        printf("\n     R(c) [A-T] = \t%7.4f", Rc);
-        printf("\n     R(d) [C-G] = \t%7.4f", Rd);
-        printf("\n     R(e) [C-T] = \t%7.4f", Re);
-        printf("\n     R(f) [G-T] = \t%7.4f", 1.0);
+        /*printf("\n     R(a) [A-C] = \t%7.4f", Ra);*/
+        /*printf("\n     R(b) [A-G] = \t%7.4f", Rb);*/
+        /*printf("\n     R(c) [A-T] = \t%7.4f", Rc);*/
+        /*printf("\n     R(d) [C-G] = \t%7.4f", Rd);*/
+        /*printf("\n     R(e) [C-T] = \t%7.4f", Re);*/
+        /*printf("\n     R(f) [G-T] = \t%7.4f", 1.0)*/;
+        printf("\n     rAC = \t%7.4f", rAC);
+        printf("\n     rAG = \t%7.4f", rAG);
+        printf("\n     rAT = \t%7.4f", rAT);
+        printf("\n     rCG = \t%7.4f", rCG);
+        printf("\n     rCT = \t%7.4f", rCT);
+        printf("\n     rGT = \t%7.4f", rGT);
     }
     printf("\n   Among-site rate variation");
     if (pinv == 0) {
@@ -1505,7 +1592,8 @@ static void SetModel(char *selection)
     /* Default parameter estimates for the selected model (JC)*/
     fA = fC = fG = fT = 0.25;
     TiTv = 0;
-    Ra = Rb = Rc = Rd = Re = Rf = 1.0;
+    /*Ra = Rb = Rc = Rd = Re = Rf = 1.0;*/
+    rAC = rAG = rAT = rCG = rCT = rGT = 1.0;
     shape = 0.0;
     pinv = 0.0;
     if (!strcmp (selection, "JCI")) {
@@ -1595,84 +1683,127 @@ static void SetModel(char *selection)
         shape = score[87];
         }
     else if (!strcmp (selection, "SYM")) {
-        Ra = score[90];
-        Rb = score[91];
-        Rc = score[92];
-        Rd = score[93];
-        Re = score[94];
+        rAC = score[90]; /*Ra = score[90];*/
+        rAG = score[91]; /*Rb = score[91];*/
+        rAT = score[92]; /*Rc = score[92];*/
+        rCG = score[93]; /*Rd = score[93];*/
+        rCT = score[94]; /*Re = score[94];*/
+        rGT = score[95];
     }
     else if (!strcmp (selection, "SYM+I")) {
-        Ra = score[97];
-        Rb = score[98];
-        Rc = score[99];
-        Rd = score[100];
-        Re = score[101];
-        pinv = score[102];
+        /*Ra = score[97];*/
+        /*Rb = score[98];*/
+        /*Rc = score[99];*/
+        /*Rd = score[100];*/
+        /*Re = score[101];*/
+        rAC = score[98];
+        rAG = score[99];
+        rAT = score[100];
+        rCG = score[101];
+        rCT = score[102];
+        rGT = score[103];
+        pinv = score[104]; /*102*/
     }
     else if (!strcmp (selection, "SYM+G")) {
-        Ra = score[105];
-        Rb = score[106];
-        Rc = score[107];
-        Rd = score[108];
-        Re = score[109];
-        shape = score[110];
+        /*Ra = score[105];*/
+        /*Rb = score[106];*/
+        /*Rc = score[107];*/
+        /*Rd = score[108];*/
+        /*Re = score[109];*/
+        rAC = score[107];
+        rAG = score[108];
+        rAT = score[109];
+        rCG = score[110];
+        rCT = score[111];
+        rGT = score[112];
+        shape = score[113]; /*110*/
         }
     else if (!strcmp (selection, "SYM+I+G")) {
-        Ra = score[113];
-        Rb = score[114];
-        Rc = score[115];
-        Rd = score[116];
-        Re = score[117];
-        pinv = score[118];
-        shape = score[119];
+        /*Ra = score[113];*/
+        /*Rb = score[114];*/
+        /*Rc = score[115];*/
+        /*Rd = score[116];*/
+        /*Re = score[117];*/
+        rAC = score[116];
+        rAG = score[117];
+        rAT = score[118];
+        rCG = score[119];
+        rCT = score[120];
+        rGT = score[121];
+        pinv = score[122]; /*118*/
+        shape = score[123]; /*119*/
     }
     else if (!strcmp (selection, "GTR")) {
-        fA = score[122];
-        fC = score[123];
-        fG = score[124];
-        fT = score[125];
-        Ra = score[126];
-        Rb = score[127];
-        Rc = score[128];
-        Rd = score[129];
-        Re = score[130];
+        fA = score[126]; /*122*/
+        fC = score[127]; /*123*/
+        fG = score[128]; /*124*/
+        fT = score[129]; /*125*/
+        /*Ra = score[126];*/
+        /*Rb = score[127];*/
+        /*Rc = score[128];*/
+        /*Rd = score[129];*/
+        /*Re = score[130];*/
+        rAC = score[130];
+        rAG = score[131];
+        rAT = score[132];
+        rCG = score[133];
+        rCT = score[134];
+        rGT = score[135];
     }
     else if (!strcmp (selection, "GTR+I")) {
-        fA = score[133];
-        fC = score[134];
-        fG = score[135];
-        fT = score[136];
-        Ra = score[137];
-        Rb = score[138];
-        Rc = score[139];
-        Rd = score[140];
-        Re = score[141];
-        pinv = score[142];
+        fA = score[138]; /*133*/
+        fC = score[139]; /*134*/
+        fG = score[140]; /*135*/
+        fT = score[141]; /*136*/
+        /*Ra = score[137];*/
+        /*Rb = score[138];*/
+        /*Rc = score[139];*/
+        /*Rd = score[140];*/
+        /*Re = score[141];*/
+        rAC = score[142];
+        rAG = score[143];
+        rAT = score[144];
+        rCG = score[145];
+        rCT = score[146];
+        rGT = score[147];
+        pinv = score[148]; /*142*/
     }
     else if (!strcmp (selection, "GTR+G")) {
-        fA = score[145];
-        fC = score[146];
-        fG = score[147];
-        fT = score[148];
-        Ra = score[149];
-        Rb = score[150];
-        Rc = score[151];
-        Rd = score[152];
-        Re = score[153];
-        shape = score[154];
+        fA = score[151]; /*145*/
+        fC = score[152]; /*146*/
+        fG = score[153]; /*147*/
+        fT = score[154]; /*148*/
+        /*Ra = score[149];*/
+        /*Rb = score[150];*/
+        /*Rc = score[151];*/
+        /*Rd = score[152];*/
+        /*Re = score[153];*/
+        rAC = score[155];
+        rAG = score[156];
+        rAT = score[157];
+        rCG = score[158];
+        rCT = score[159];
+        rGT = score[160];
+        shape = score[161]; /*154*/
     }
     else if (!strcmp (selection, "GTR+I+G")) {
-        fA = score[157];
-        fC = score[158];
-        fG = score[159];
-        fT = score[160];
-        Ra = score[161];
-        Rb = score[162];
-        Rc = score[163];
-        Rd = score[164];
-        Re = score[165];
-        pinv = score[166];
-        shape = score[167];
+        fA = score[164]; /*157*/
+        fC = score[165]; /*158*/
+        fG = score[166]; /*159*/
+        fT = score[167]; /*160*/
+        rAC = score[168];
+        rAG = score[169];
+        rAT = score[170];
+        rCG = score[171];
+        rCT = score[172];
+        rGT = score[173];
+        /*Ra = score[161];*/
+        /*Rb = score[162];*/
+        /*Rc = score[163];*/
+        /*Rd = score[164];*/
+        /*Re = score[165];*/
+        pinv = score[174]; /*166*/
+        shape = score[175]; /*167*/
     }
 }
 
@@ -2196,19 +2327,19 @@ static void PrintDate (FILE *fp)
     If value is NA prints "-"
 
 */
-static char *CheckNA (double value)
-{
-    char *string;
-
-    string = (char*) calloc (100, sizeof (char));
-    if (value == NA) {
-        return "  -  ";
-    }
-    else {
-        sprintf (string, "%8.4f", value);
-        return string;
-    }
-}
+//static char *CheckNA (double value)
+//{
+//    char *string;
+//
+//    string = (char*) calloc (100, sizeof (char));
+//    if (value == NA) {
+//        return "  -  ";
+//    }
+//    else {
+//        sprintf (string, "%8.4f", value);
+//        return string;
+//    }
+//}
 
 /*********************** PrintUsage ********************************/
 static void PrintUsage()
@@ -2248,7 +2379,7 @@ static void PrintUsage()
     fprintf(stderr,"\n         -n : sample size or number of characters (all or just variable). Forces the use of AICc");
     fprintf(stderr,"\n         -t : number of taxa. Forces to include branch lengths as parameters");
     fprintf(stderr,"\n         -v : prints version number");
-    fprintf(stderr,"\n         -w : confidence interval for averaging (e.g., -w0.95) (default is w=1.0)");
+    /*fprintf(stderr,"\n         -w : confidence interval for averaging (e.g., -w0.95) (default is w=1.0)");*/
     fprintf(stderr,"\n\nUNIX/MACOSX/WIN usage: mrmodeltest2 [-d -a -c -t -2 -3 -4 -l -i -f -? -h] < mrmodel.scores > outfile\n\n");
     /*fprintf(stderr,"\n\nHit return to close this window!\n\n");*/    /*For windows.*/
 }

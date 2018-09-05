@@ -1,5 +1,5 @@
 #NEXUS
-[Johan Nylander 2004-07-01]
+[Johan Nylander 2018-09-05]
 
 [! ***** MrModeltest block -- Modified from MODELTEST 3.0 *****]
 
@@ -16,7 +16,6 @@ End;
 ***** BEGIN TESTING 24 MODELS OF EVOLUTION ***** ]
 
 BEGIN PAUP;
-	Default lscores longfmt=yes; [Workaround for the bug in PAUP 4b10]
 	Set criterion=like;
 
 	[!
