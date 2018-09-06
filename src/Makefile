@@ -1,5 +1,7 @@
 CC = gcc
-CFLAGS  = -O3 -Wno-unused-result -Wall 
+
+CFLAGS  = -O3 -Wall 
+
 LIBS = -lm
 
 TARGET = mrmodeltest2
