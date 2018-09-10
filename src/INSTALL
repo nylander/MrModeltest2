@@ -1,21 +1,17 @@
-02/22/2013 02:27:42 PM
+Version: Fri 07 Sep 2018
 
-To compile (and install):
+To compile on UNIX/MacOS, make sure you have the
+program `make` and a C compiler (e.g. `gcc`) 
+installed, then type:
 
     make
 
-Then move the generated binary ("mrmodeltest2") somewhere in the PATH. 
+Then move the generated binary file (`mrmodeltest2`)
+to somewhere in your PATH. 
 
+For use on MS Windows, invoke make with the `win`
+argument when compiling (on a MS Windows OS compile
+system. I've used `MinGW` in the past):
 
-
-For Mac users:
-
-The Makefile.MACOSX is not tested recently.
-Try changing the 'CFLAGS -L' option if in trouble.
-
-
-For compiling on windows:
-
-Uncomment the lines in mrmodeltest2.c saying "For windows"
-Then compile using your favourite Windows C compiler (I used mingw in the past).
+    make win
 

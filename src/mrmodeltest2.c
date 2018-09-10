@@ -1,29 +1,30 @@
 /*
     Title:            MrModeltest2
-    Version:          UNIX, MacOSX, Win32
-    Latest changes:   Tue 06 Sep 2018
+    Version:          UNIX, MacOS, Win
+    Latest changes:   Tue 07 Sep 2018
     Programmer:       Johan Nylander
-                      Uppsala University
                       E-mail: johan.nylander@nbis.se
-    Notes:            This is a simplified version of David Posada's modeltest v.3.6.
+    Notes:            This is a simplified version of David Posada's Modeltest v.3.6.
                       The difference between MrM. and M. is that MrM. only tests 24
                       substittion models; the 24 nucleotide-substitution models
-                      currently implemented in MrBayes v3. Modeltest tests 56 models,
+                      currently implemented in MrBayes v.3. Modeltest tests 56 models,
                       some of them not implemeted in MrBayes.
                       In addition, MrM allow the user to choose different hierarchies
                       for the likelihood-ratio tests, and prints an example of how to
-                      implement the selected model in MrBayes v3.
+                      implement the selected model in MrBayes v.3.
     Credits:          David Posada supplied the original code for Modeltest.
-    Version history:  MrModeltest2.2, 2005-02-01: Fixed a bug affecting
+    Version history:  2005-02-01: MrModeltest2.2. Fixed a bug affecting
                       the printing of PAUP and MrBayes blocks.
-                      MrModeltest2.3 2008-04-16: The MrBayes block was not printed
+                      2008-04-16: MrModeltest2.3. The MrBayes block was not printed
                       correctly: The settings made by the Prset command was overwritten
                       by the Lset command if issued before the Lset command. Thanks to
                       Ted Schultz.
-                      2016-11-02: Took care of some compiler warnings and cleaned the code.
-                      MrModeltest2.4 2018-09-06: The output from PAUP* changed. The program
-                      can now only read the new format ("lscores scfileformat=v2"). Thanks
-                      to Leila Carmona.
+                      2016-11-02: MrModeltest2.3. Took care of some compiler warnings
+                      and cleaned the code.
+                      2018-09-06: MrModeltest2.4. The output from PAUP* changed.
+                      The program can now only read the new format
+                      ("lscores scfileformat=v2"). Thanks to Leila Carmona, and
+                      Andreas Kähäri.
     ===========================================================================
             Below are David's original notes on Modeltest.
     ===========================================================================
@@ -125,6 +126,10 @@
 #define NUM_MODELS     24
 #define NUM_SCORES     175
 
+#ifndef WIN
+#define WIN            0
+#endif
+
 /* Structures */
 typedef struct {
     float ln;
@@ -161,7 +166,7 @@ static double LRT(ModelSt *model0, ModelSt *model1);
 static double LRTmix(ModelSt *model0, ModelSt *model1);
 static void PrintRunSettings();
 static void ModelAveraging();
-static void AverageEstimates (char *parameter, int numModels, int modelIndex[], int estimateIndex[],
+static void AverageEstimates (int numModels, int modelIndex[], int estimateIndex[],
     double *importance, double *averagedEstimate, double minWeightToAverage);
 static double FindMinWeightToAverage ();
 static char *CheckNA (double value);
@@ -236,7 +241,9 @@ int main(int argc, char **argv)
     if (file_id) {
         fprintf(stderr, "\n\nNo input file\n\n");
         PrintUsage();
-        /*getchar();*/    /*For windows.*/
+        if (WIN == 1) {
+            getchar();    /*For windows.*/
+        }
         exit(1);
     }
     PrintTitle(stdout);
@@ -347,6 +354,7 @@ int main(int argc, char **argv)
     printf("\nTime processing: %G seconds", secs);
     printf("\nIf you need help type '-?' or '-h' in the command line of the program");
     fprintf(stderr, "\nProgram is done.\n\n");
+
     return 0;
 }
 
@@ -358,7 +366,7 @@ static void PrintRunSettings()
     fprintf (stdout, "\n\nRun settings\n");
     if (sampleSize > 0) {
         useAICc = YES;
-        /* Check the data is large enough*/
+        /* Check if data is large enough*/
         if (sampleSize <= model[NUM_MODELS-1].parameters) {
             fprintf (stdout, "\n\nYou have more parameters than data for some models!");
             fprintf (stdout, "\nCalculations cannot be performed. Exiting the program ...\n");
@@ -513,7 +521,10 @@ static void ReadPaupScores()
         iochar = getc(stdin);
         if (isdigit(iochar)) {
             ungetc(iochar, stdin);
-            scanf("%f", &score[i]);
+            if (scanf("%f", &score[i]) != 1) {
+                fprintf (stderr, "\nError: could not read value using scanf()");
+                exit (1);
+            }
             if (DEBUGLEVEL >= 2) {
                 fprintf(stdout, "\nINFO:   Storing %f in score[%d]", score[i], i);
             }
@@ -521,7 +532,10 @@ static void ReadPaupScores()
         }
         if (isalpha (iochar)) {
             ungetc(iochar, stdin);
-            scanf("%s", string);
+            if (scanf("%s", string) != 1) {
+                fprintf (stderr, "\nError: could not read value using scanf()");
+                exit (1);
+            }
             if (DEBUGLEVEL >= 2) {
                 fprintf(stdout, "\nINFO:   Reading string %s", string);
             }
@@ -534,7 +548,7 @@ static void ReadPaupScores()
         }
     }
     if (ferror(stdin)) {
-        perror ("MrModeltest");
+        perror ("MrModeltest2");
         clearerr(stdin);
     }
     Initialize();
@@ -676,7 +690,10 @@ static void ReadScores()
 
     score[NUM_MODELS-1] = 0;
     while (!feof(stdin)) {
-        scanf("%f", &score[i]);
+        if (scanf("%f", &score[i]) != 1) {
+            fprintf (stderr, "\nError: could not read value using scanf()");
+            exit (1);
+        }
         i++;
     }
     Initialize();
@@ -720,6 +737,7 @@ static double LRT(ModelSt *model0, ModelSt *model1)
     else {
         printf("\n   P-value =  %f", prob);
     }
+
     return prob;
 }
 
@@ -756,6 +774,7 @@ static double LRTmix(ModelSt *model0, ModelSt *model1)
     else {
         printf("\n   P-value =  %f", prob);
     }
+
     return prob;
 }
 
@@ -766,6 +785,7 @@ float TestEqualBaseFrequencies(ModelSt *model0, ModelSt *model1)
 
     printf("\n Equal base frequencies");
     P = LRT(model0, model1);
+
     return P;
 }
 
@@ -776,6 +796,7 @@ float TestTiequalsTv(ModelSt *model0, ModelSt *model1)
 
     printf("\n Ti=Tv");
     P = LRT(model0, model1);
+
     return P;
 }
 
@@ -786,6 +807,7 @@ float TestEqualTiAndEqualTvRates (ModelSt *model0, ModelSt *model1)
 
     printf("\n Unequal Tv and unequal Ti");
     P = LRT(model0, model1);
+
     return P;
 }
 
@@ -801,6 +823,7 @@ float TestEqualSiteRates (ModelSt *model0, ModelSt *model1)
     else {
         P = LRT(model0, model1);
     }
+
     return P;
 }
 
@@ -816,6 +839,7 @@ float TestInvariableSites (ModelSt *model0, ModelSt *model1)
     else {
         P = LRT(model0, model1);
     }
+
     return P;
 }
 
@@ -911,6 +935,7 @@ float Normalz (float z)        /*VAR returns cumulative probability from -oo to 
                 +0.000535310849) * y +0.999936657524;
         }
     }
+
     return (z > 0.0 ? ((x + 1.0) * 0.5) : ((1.0 - x) * 0.5));
 }
 
@@ -920,30 +945,31 @@ static void RatioCalc()
     float score1, score2, ratio, prob;
     int df;
 
-    /* Note: scanf generates a compiler error if it's return value is ignored.
-     * Should really do:
-     *
-     *     if (scanf("%f", &score1) == 1) {
-     *         // read success, do whatever
-     *     } else {
-     *         printf("Failed to read likelihood score.\n");
-     *     }
-     *
-     */
-
     printf("\nPlease, input the POSITIVE log likelihood score corresponding to \nthe null model> ");
-    scanf("%f", &score1);
+    if (scanf("%f", &score1) != 1) {
+        fprintf (stderr, "\nError: could not read value using scanf()");
+        exit (1);
+    }
     while (score1 < 0) {
         printf("\nBad Input: the program doesn't accept negative likelihood scores");
         printf("\n\nPlease, input the POSITIVE log likelihood score corresponding to \nthe null model> ");
-        scanf("%f", &score1);
+        if (scanf("%f", &score1) != 1) {
+            fprintf (stderr, "\nError: could not read value using scanf()");
+            exit (1);
+        }
     }
     printf("\nPlease, input the POSITIVE log likelihood score corresponding to \nthe alternative model> ");
-    scanf("%f", &score2);
+    if (scanf("%f", &score2) != 1) {
+        fprintf (stderr, "\nError: could not read value using scanf()");
+        exit (1);
+    }
     while (score2 < 0) {
         printf("Bad Input: the program doesn't accept negative likelihood scores");
         printf("\nPlease, input the POSITIVE log likelihood score corresponding to \nthe alternative model> ");
-        scanf("%f", &score2);
+        if (scanf("%f", &score2) != 1) {
+            fprintf (stderr, "\nError: could not read value using scanf()");
+            exit (1);
+        }
     }
     if (score1 < score2) {
         printf("\n\nIncorrect input: the positive likelihood of the null model cannot be smaller than the positive likelihood of the alternative model.");
@@ -951,11 +977,17 @@ static void RatioCalc()
         exit(0);
     }
     printf("\nPlease, input the number of degrees of freedom> ");
-    scanf("%d", &df);
+    if (scanf("%d", &df) != 1) {
+        fprintf (stderr, "\nError: could not read value using scanf()");
+        exit (1);
+    }
     while (df < 1) {
         printf("\nThe number of degrees of freedom should be at least 1");
         printf("\nPlease, input the number of degrees of freedom> ");
-        scanf("%d", &df);
+        if (scanf("%d", &df) != 1) {
+            fprintf (stderr, "\nError: could not read value using scanf()");
+            exit (1);
+        }
     }
     ratio = 2*(score1-score2);
     prob = ChiSquare(ratio, df);
@@ -1132,21 +1164,21 @@ void ModelAveraging()
     }
 
     /* calculate importances and model-averaged estimates */
-    AverageEstimates ("piA", 12, mpiA, epiA, &ipiA, &wpiA, minWeightToAverage);
-    AverageEstimates ("piC", 12, mpiC, epiC, &ipiC, &wpiC, minWeightToAverage);
-    AverageEstimates ("piG", 12, mpiG, epiG, &ipiG, &wpiG, minWeightToAverage);
-    AverageEstimates ("piT", 12, mpiT, epiT, &ipiT, &wpiT, minWeightToAverage);
-    AverageEstimates ("titv", 8, mtitv, etitv, &ititv, &wtitv, minWeightToAverage);
-    AverageEstimates ("rAC", 8, mrAC, erAC, &irAC, &wrAC, minWeightToAverage);
-    AverageEstimates ("rAG", 8, mrAG, erAG, &irAG, &wrAG, minWeightToAverage);
-    AverageEstimates ("rAT", 8, mrAT, erAT, &irAT, &wrAT, minWeightToAverage);
-    AverageEstimates ("rCG", 8, mrCG, erCG, &irCG, &wrCG, minWeightToAverage);
-    AverageEstimates ("rCT", 8, mrCT, erCT, &irCT, &wrCT, minWeightToAverage);
-    AverageEstimates ("rGT", 8, mrGT, erGT, &irGT, &wrGT, minWeightToAverage);
-    AverageEstimates ("pinv(I)", 6, mpinvI, epinvI, &ipinvI, &wpinvI, minWeightToAverage);
-    AverageEstimates ("alpha(G)", 6, malphaG, ealphaG, &ialphaG, &walphaG, minWeightToAverage);
-    AverageEstimates ("pinv(IG)", 12, mpinvIG, epinvIG, &ipinvIG, &wpinvIG, minWeightToAverage);
-    AverageEstimates ("alpha(IG)", 12, malphaIG, ealphaIG, &ialphaIG, &walphaIG, minWeightToAverage);
+    AverageEstimates (12, mpiA, epiA, &ipiA, &wpiA, minWeightToAverage); /*piA*/
+    AverageEstimates (12, mpiC, epiC, &ipiC, &wpiC, minWeightToAverage); /*piC*/
+    AverageEstimates (12, mpiG, epiG, &ipiG, &wpiG, minWeightToAverage); /*piG*/
+    AverageEstimates (12, mpiT, epiT, &ipiT, &wpiT, minWeightToAverage); /*piT*/
+    AverageEstimates (8, mtitv, etitv, &ititv, &wtitv, minWeightToAverage); /*titv*/
+    AverageEstimates (8, mrAC, erAC, &irAC, &wrAC, minWeightToAverage); /*rAC*/
+    AverageEstimates (8, mrAG, erAG, &irAG, &wrAG, minWeightToAverage); /*rAG*/
+    AverageEstimates (8, mrAT, erAT, &irAT, &wrAT, minWeightToAverage); /*rAT*/
+    AverageEstimates (8, mrCG, erCG, &irCG, &wrCG, minWeightToAverage); /*rCG*/
+    AverageEstimates (8, mrCT, erCT, &irCT, &wrCT, minWeightToAverage); /*rCT*/
+    AverageEstimates (8, mrGT, erGT, &irGT, &wrGT, minWeightToAverage); /*rGT*/
+    AverageEstimates (6, mpinvI, epinvI, &ipinvI, &wpinvI, minWeightToAverage); /*pinv(I)*/
+    AverageEstimates (6, malphaG, ealphaG, &ialphaG, &walphaG, minWeightToAverage); /*alpha(G)*/
+    AverageEstimates (12, mpinvIG, epinvIG, &ipinvIG, &wpinvIG, minWeightToAverage); /*pinv(IG)*/
+    AverageEstimates (12, malphaIG, ealphaIG, &ialphaIG, &walphaIG, minWeightToAverage); /*alpha(IG)*/
 
     /* print results */
     printf ("\n\n\n\n* MODEL AVERAGING AND PARAMETER IMPORTANCE (using Akaike Weights)");
@@ -1192,11 +1224,10 @@ void ModelAveraging()
 /*
     Calculates parameter importance and averaged estimates
 */
-void AverageEstimates (char *whichParameter, int numModels, int *modelIndex, int *estimateIndex, double *importance, double *averagedEstimate, double minWeightToAverage)
+void AverageEstimates (int numModels, int *modelIndex, int *estimateIndex, double *importance, double *averagedEstimate, double minWeightToAverage)
 {
     int i;
 
-    whichParameter = whichParameter; /* just to avoid warnings */
     for (i=0; i < numModels; i++) {
         if (wAIC[modelIndex[i]] < minWeightToAverage) {
             continue;
@@ -1225,6 +1256,7 @@ double FindMinWeightToAverage ()
     double minWeight, cumWeight;
 
     cumWeight = 0;
+    minWeight = 0;
     for (i = 0; i < NUM_MODELS; i++) {
         cumWeight += wAIC[orderedAIC[i]];
         if (cumWeight > averagingConfidenceInterval) {
@@ -1234,6 +1266,7 @@ double FindMinWeightToAverage ()
             break;
         }
     }
+
     return minWeight;
 }
 
@@ -1280,7 +1313,6 @@ void AICfile()
 /*Andreas K's version Sept. 2018 */
 int AICCalc()
 {
-
     double ln[300];
     int n[300];
     double AIC[300];
@@ -2251,10 +2283,7 @@ static void PrintDate (FILE *fp)
 }
 
 /************** CheckNA **********************/
-/*
-    If value is NA prints "-"
-
-*/
+/* If value is NA prints "-" */
 static char *CheckNA (double value)
 {
     char *string;
@@ -2310,8 +2339,10 @@ static void PrintUsage()
     fprintf(stderr, "\n         -t : number of taxa. Forces to include branch lengths as parameters");
     fprintf(stderr, "\n         -v : prints version number");
     fprintf(stderr, "\n         -w : confidence interval for averaging (e.g., -w0.95) (default is w=1.0)");
-    fprintf(stderr, "\n\nUNIX/MACOSX/WIN usage: mrmodeltest2 [-d -a -c -t -2 -3 -4 -l -i -f -? -h] < mrmodel.scores > outfile\n\n");
-    /*fprintf(stderr, "\n\nHit return to close this window!\n\n");*/    /*For windows.*/
+    fprintf(stderr, "\n\nUNIX/MACOSX/WIN usage: mrmodeltest2 [-d -a -c -t -2 -3 -4 -l -i -f -w -? -h] < mrmodel.scores > outfile\n\n");
+    if (WIN == 1) {
+        fprintf(stderr, "\n\nHit return to close this window!\n\n");    /*For windows.*/
+    }
 }
 
 /********************** Allocate *************************/
