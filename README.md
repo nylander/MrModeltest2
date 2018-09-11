@@ -53,16 +53,14 @@ Installing the pre-build program on Windows or MacOSX
 'bin' folder) and use directly (see Running MrModeltest2 below) or, preferrably,
 copy it to a location included in your PATH.
 
-Note: The windows version is compiled and tested on Win XP.
 
-
-Installing from source (on UNIX/MacOSX)
+Installing from source (See file `src/INSTALL`)
 
 1. cd into the distribution src directory:
 
         cd MrModeltest2/src
 
-2. Compile by typing (try `make -f Makefile.MACOSX` if `make` fails on the Mac):
+2. Compile by typing:
 
         make
 

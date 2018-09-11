@@ -1,8 +1,8 @@
-Version: Fri 07 Sep 2018
+Version: 09/11/2018
 
-To compile on UNIX/MacOS, make sure you have the
-program `make` and a C compiler (e.g. `gcc`) 
-installed, then type:
+To compile on UNIX/Mac OS X/Mac OS/ MS Windows, make 
+sure you have the program `make` and a C compiler 
+(e.g. `gcc`) installed, then type:
 
     make
 
