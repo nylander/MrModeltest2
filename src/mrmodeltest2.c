@@ -1,25 +1,30 @@
 /*
     Title:            MrModeltest2
-    Version:          UNIX, MacOSX, Win32
-    Latest changes:   11/03/2016 01:10:12 PM
+    Version:          UNIX, MacOS, Win
+    Latest changes:   Tue 07 Sep 2018
     Programmer:       Johan Nylander
-                      Uppsala University
-                      E-mail: johan.nylander@ebc.uu.se
-    Notes:            This is a simplified version of David Posada's modeltest v.3.6.
+                      E-mail: johan.nylander@nbis.se
+    Notes:            This is a simplified version of David Posada's Modeltest v.3.6.
                       The difference between MrM. and M. is that MrM. only tests 24
                       substittion models; the 24 nucleotide-substitution models
-                      currently implemented in MrBayes v3. Modeltest tests 56 models,
+                      currently implemented in MrBayes v.3. Modeltest tests 56 models,
                       some of them not implemeted in MrBayes.
                       In addition, MrM allow the user to choose different hierarchies
                       for the likelihood-ratio tests, and prints an example of how to
-                      implement the selected model in MrBayes v3.
-    Credits:          David Posada are truly thanked for supplying the excellent code in Modeltest!
-    Version history:  MrModeltest2.2, 2005-02-01: Fixed a bug affecting
+                      implement the selected model in MrBayes v.3.
+    Credits:          David Posada supplied the original code for Modeltest.
+    Version history:  2005-02-01: MrModeltest2.2. Fixed a bug affecting
                       the printing of PAUP and MrBayes blocks.
-                      MrModeltest2.3 2008-04-16: The MrBayes block was not printed correctly:
-                      The settings made by the Prset command was overwritten by the Lset
-                      command if issued before the Lset command. Thanks to Ted Schultz.
-                      2016-11-02: Took care of some compiler warnings and cleaned the code.
+                      2008-04-16: MrModeltest2.3. The MrBayes block was not printed
+                      correctly: The settings made by the Prset command was overwritten
+                      by the Lset command if issued before the Lset command. Thanks to
+                      Ted Schultz.
+                      2016-11-02: MrModeltest2.3. Took care of some compiler warnings
+                      and cleaned the code.
+                      2018-09-06: MrModeltest2.4. The output from PAUP* changed.
+                      The program can now only read the new format
+                      ("lscores scfileformat=v2"). Thanks to Leila Carmona, and
+                      Andreas Kähäri.
     ===========================================================================
             Below are David's original notes on Modeltest.
     ===========================================================================
@@ -93,6 +98,7 @@
                                Aesthetic changes
                                Argument for specifying sample size is now -n (it was -c)
 */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -110,7 +116,7 @@
 #define MAX_PROB       0.999999
 #define MIN_PROB       0.000001
 #define PROGRAM_NAME   "MrModeltest"
-#define VERSION_NUMBER "2.3"
+#define VERSION_NUMBER "2.4"
 #define SUCCESS        1
 #define FAILURE        0
 #define YES            1
@@ -118,6 +124,11 @@
 #define BIGNUMBER      9999999
 #define NA             -99999
 #define NUM_MODELS     24
+#define NUM_SCORES     175
+
+#ifndef WIN
+#define WIN            0
+#endif
 
 /* Structures */
 typedef struct {
@@ -141,7 +152,7 @@ static void hLRT3();
 static void hLRT4();
 static void CalculateAIC();
 static void AkaikeWeights ();
-static void AICCalc();
+static int AICCalc();
 static void AICfile();
 static void SetModel(char[]);
 static void Allocate();
@@ -155,8 +166,8 @@ static double LRT(ModelSt *model0, ModelSt *model1);
 static double LRTmix(ModelSt *model0, ModelSt *model1);
 static void PrintRunSettings();
 static void ModelAveraging();
-static void AverageEstimates (char *parameter, int numModels, int modelIndex[], int estimateIndex[],
-double *importance, double *averagedEstimate, double minWeightToAverage);
+static void AverageEstimates (int numModels, int modelIndex[], int estimateIndex[],
+    double *importance, double *averagedEstimate, double minWeightToAverage);
 static double FindMinWeightToAverage ();
 static char *CheckNA (double value);
 float ChiSquare (float x, int);
@@ -171,7 +182,7 @@ float TestInvariableSites(ModelSt *, ModelSt *);
 ModelSt *JC, *F81;
 ModelSt *JC, *JCI, *JCG, *JCIG, *F81, *F81I, *F81G, *F81IG, *K80, *K80I, *K80G, *K80IG;
 ModelSt *HKY, *HKYI, *HKYG, *HKYIG, *SYM, *SYMI, *SYMG, *SYMIG, *GTR, *GTRI, *GTRG, *GTRIG;
-float score[168];
+float score[176]; /* Check this value. 175 scores in the infile.*/
 float ln[NUM_MODELS];
 float AIC[NUM_MODELS];
 float wAIC[NUM_MODELS];
@@ -203,9 +214,9 @@ float averagingConfidenceInterval;
 double cumConfidenceWeight;
 
 /* Parameter estimates for the selected model */
-float fA, fC, fG, fT;
+float piA, piC, piG, piT;
 float TiTv;
-float Ra, Rb, Rc, Rd, Re, Rf;
+float rAC, rAG, rAT, rCG, rCT, rGT;
 float shape;
 float pinv;
 float theln;
@@ -230,7 +241,9 @@ int main(int argc, char **argv)
     if (file_id) {
         fprintf(stderr, "\n\nNo input file\n\n");
         PrintUsage();
-        /*getchar();*/    /*For windows.*/
+        if (WIN == 1) {
+            getchar();    /*For windows.*/
+        }
         exit(1);
     }
     PrintTitle(stdout);
@@ -271,23 +284,23 @@ int main(int argc, char **argv)
 
     if (format == 0) {
         if (shape > 999) { /* alpha shape = infinity */
-            printf("\n\nWARNING: Although the model %s was initially selected, gamma (G) was removed ",modelhLRT);
+            printf("\n\nWARNING: Although the model %s was initially selected, gamma (G) was removed ", modelhLRT);
             printf("because the estimated shape equals infinity, which implies equal rates among sites.");
             /* removing +G */
             nexttok1 = strtok(modelhLRT, "+");
             strcpy(modelhLRT, nexttok1);
-            if (!strcmp(strtok(NULL, "+"),"I")) {
-                strcat(modelhLRT,"+I");
+            if (!strcmp(strtok(NULL, "+"), "I")) {
+                strcat(modelhLRT, "+I");
             }
         }
-        else if (usehLRT2 == usehLRT3 && usehLRT2 == usehLRT4 && usehLRT3 == usehLRT4) { /* Old: if (usehLRT2 == usehLRT3 == usehLRT4) */
-            Output (modelhLRT,0);
+        else if (usehLRT2 == usehLRT3 && usehLRT2 == usehLRT4 && usehLRT3 == usehLRT4) {
+            Output (modelhLRT, 0);
             PrintPaupBlock (YES);
             PrintMbBlock (YES);
         }
         else {
             HLRTAttention (modelhLRT, modelhLRT2, modelhLRT3, modelhLRT4);
-            Output (modelhLRT,0);
+            Output (modelhLRT, 0);
             PrintPaupBlock (YES);
             PrintMbBlock (YES);
         }
@@ -323,7 +336,7 @@ int main(int argc, char **argv)
     CalculateAIC();
     SetModel(modelAIC);
     if (format == 0) {
-        Output (modelAIC,minAIC);
+        Output (modelAIC, minAIC);
         PrintPaupBlock(NO);
         PrintMbBlock(NO);
     }
@@ -341,6 +354,7 @@ int main(int argc, char **argv)
     printf("\nTime processing: %G seconds", secs);
     printf("\nIf you need help type '-?' or '-h' in the command line of the program");
     fprintf(stderr, "\nProgram is done.\n\n");
+
     return 0;
 }
 
@@ -349,10 +363,10 @@ static void PrintRunSettings()
 {
     int i;
     /* Check settings */
-    fprintf (stdout,"\n\nRun settings\n");
+    fprintf (stdout, "\n\nRun settings\n");
     if (sampleSize > 0) {
         useAICc = YES;
-        /* Check the data is large enough*/
+        /* Check if data is large enough*/
         if (sampleSize <= model[NUM_MODELS-1].parameters) {
             fprintf (stdout, "\n\nYou have more parameters than data for some models!");
             fprintf (stdout, "\nCalculations cannot be performed. Exiting the program ...\n");
@@ -394,7 +408,7 @@ static void PrintRunSettings()
 }
 
 /******************** ReadArgs **************************/
-static void ReadArgs(int argc,char **argv)
+static void ReadArgs(int argc, char **argv)
 {
     int i;
     char flag;
@@ -407,7 +421,7 @@ static void ReadArgs(int argc,char **argv)
         case 'd':
             DEBUGLEVEL = atoi(argv[i]);
             if (DEBUGLEVEL >= 2)
-                fprintf(stderr,"DEBUGLEVEL set to %d\n", DEBUGLEVEL);
+                fprintf(stderr, "DEBUGLEVEL set to %d\n", DEBUGLEVEL);
             break;
         case 'a':
             alpha = atof(argv[i]);
@@ -449,7 +463,7 @@ static void ReadArgs(int argc,char **argv)
             usehLRT4 = YES;
             break;
         case 'v':
-            fprintf(stderr,"%s version %s\n",PROGRAM_NAME, VERSION_NUMBER);
+            fprintf(stderr, "%s version %s\n", PROGRAM_NAME, VERSION_NUMBER);
             exit(1);
             break;
         case 'w':
@@ -464,7 +478,7 @@ static void ReadArgs(int argc,char **argv)
             }
             break;
         default:
-            fprintf(stderr,"Unknown argument on the command line '%c'\n",flag);
+            fprintf(stderr, "Unknown argument on the command line '%c'\n", flag);
             exit(1);
             break;
         }
@@ -477,18 +491,18 @@ static void RecognizeInputFormat()
     int iochar;
 
     if (stdin == NULL) {
-        fprintf(stderr,"Error opening the input file");
+        fprintf(stderr, "Error opening the input file");
         exit(0);
     }
     iochar = getc(stdin);
-    if (iochar == (int)'T') {   /* In the Paup matrix, in the first line there is the word 'Tree'*/ /*Att göra: kolla input format? */
-        ungetc(iochar,stdin);
+    if (iochar == (int)'T') {   /* In the Paup matrix, in the first line there is the word 'Tree'*/
+        ungetc(iochar, stdin);
         printf("\nInput format: Paup matrix file \n");
         format = 0;
         ReadPaupScores();
     }
     else {
-        ungetc(iochar,stdin);
+        ungetc(iochar, stdin);
         printf("\nInput format: raw log likelihood scores \n");
         format = 1;
         ReadScores();
@@ -499,36 +513,42 @@ static void RecognizeInputFormat()
 static void ReadPaupScores()
 {
     int iochar;
-    int i,j,k;
+    int i, j, k;
     char string [120];
-    i=0;
+    i = 0;
 
     while (!feof(stdin)) {
         iochar = getc(stdin);
         if (isdigit(iochar)) {
-            ungetc(iochar,stdin);
-            scanf("%f", &score[i]);
+            ungetc(iochar, stdin);
+            if (scanf("%f", &score[i]) != 1) {
+                fprintf (stderr, "\nError: could not read value using scanf()");
+                exit (1);
+            }
             if (DEBUGLEVEL >= 2) {
-                fprintf(stdout,"\nINFO:   Storing %f in score[%d]", score[i],i);
+                fprintf(stdout, "\nINFO:   Storing %f in score[%d]", score[i], i);
             }
             i++;
         }
         if (isalpha (iochar)) {
-            ungetc(iochar,stdin);
-            scanf("%s",string);
-            if (DEBUGLEVEL >= 2) {
-                fprintf(stdout,"\nINFO:   Reading string %s", string);
+            ungetc(iochar, stdin);
+            if (scanf("%s", string) != 1) {
+                fprintf (stderr, "\nError: could not read value using scanf()");
+                exit (1);
             }
-            if (strcmp(string,"infinity") == 0) {
+            if (DEBUGLEVEL >= 2) {
+                fprintf(stdout, "\nINFO:   Reading string %s", string);
+            }
+            if (strcmp(string, "infinity") == 0) {
                 score[i] = 999.999;
                 if (DEBUGLEVEL >= 2)
-                fprintf(stdout,"INFO:   Storing %f in score[%d]", score[i],i);
+                fprintf(stdout, "\nINFO:   Storing %f in score[%d]", score[i], i);
                 i++;
             }
         }
     }
     if (ferror(stdin)) {
-        perror ("MrModeltest");
+        perror ("MrModeltest2");
         clearerr(stdin);
     }
     Initialize();
@@ -541,16 +561,17 @@ static void ReadPaupScores()
         printf("\n\n");
     }
     for (j = 0; j < NUM_MODELS; j++) {
-        if (model[j].ln == 0 || i < 167) { /*Att göra: kolla detta värde! Ev 166. */
-            printf("\n\nThe input file is incomplete or incorrect. \nAre you using the most updated block of PAUP* commands?. ");
-            printf("\nThis version of MrModeltest is not compatible with versions of PAUP* older than PAUP*4.0beta3");
-            printf("\nCheck the Modeltest and PAUP* web pages");
+        if (model[j].ln == 0 || i < NUM_SCORES) {
+            printf("\n\nError: The input file is incomplete or incorrect.\nAre you using the most updated block of PAUP* commands?");
+            printf("\nThis version of MrModeltest2 is not compatible with versions of PAUP* older than v.4.0a155.");
+            printf("\nPlease check the MrModeltest2 and PAUP* web pages.");
             exit(0);
         }
      }
 }
 
-/************** Initialize. Modified by Johan 2002-03-18 **********************/
+/************** Initialize. **********************/
+/* New versions of paup (> 4.0a154) prints a different output.*/
 void Initialize()
 {
     JC =     model;      model[0].ln = order[0].ln = score[1];
@@ -570,13 +591,13 @@ void Initialize()
     HKYG =   model + 14; model[14].ln = order[14].ln = score[72];
     HKYIG =  model + 15; model[15].ln = order[15].ln = score[80];
     SYM =    model + 16; model[16].ln = order[16].ln = score[89];
-    SYMI =   model + 17; model[17].ln = order[17].ln = score[96];
-    SYMG =   model + 18; model[18].ln = order[18].ln = score[104];
-    SYMIG =  model + 19; model[19].ln = order[19].ln = score[112];
-    GTR =    model + 20; model[20].ln = order[20].ln = score[121];
-    GTRI =   model + 21; model[21].ln = order[21].ln = score[132];
-    GTRG =   model + 22; model[22].ln = order[22].ln = score[144];
-    GTRIG =  model + 23; model[23].ln = order[23].ln = score[156];
+    SYMI =   model + 17; model[17].ln = order[17].ln = score[97];
+    SYMG =   model + 18; model[18].ln = order[18].ln = score[106];
+    SYMIG =  model + 19; model[19].ln = order[19].ln = score[115];
+    GTR =    model + 20; model[20].ln = order[20].ln = score[125];
+    GTRI =   model + 21; model[21].ln = order[21].ln = score[137];
+    GTRG =   model + 22; model[22].ln = order[22].ln = score[150];
+    GTRIG =  model + 23; model[23].ln = order[23].ln = score[163];
     /* free parameters */
     /* JC */
     model[0].parameters = order[0].parameters = 0;
@@ -664,17 +685,20 @@ void Initialize()
 static void ReadScores()
 {
     float score[NUM_MODELS];
-    int i,j;
-    i=0;
+    int i, j;
+    i = 0;
 
     score[NUM_MODELS-1] = 0;
     while (!feof(stdin)) {
-        scanf("%f", &score[i]);
+        if (scanf("%f", &score[i]) != 1) {
+            fprintf (stderr, "\nError: could not read value using scanf()");
+            exit (1);
+        }
         i++;
     }
     Initialize();
     for (j = 0; j < NUM_MODELS; j++) {
-        if (model[j].ln == 0 || i < 167) {
+        if (model[j].ln == 0 || i < NUM_SCORES) {
             printf("\n\nThe input file is incomplete or incorrect. \nAre you using the most updated block of PAUP* commands?.\n ");
             exit(0);
         }
@@ -686,7 +710,7 @@ static void ReadScores()
 }
 
 /******************* LRT ******************************/
-/* peforms a likelihood ratio test */
+/* performs a likelihood ratio test */
 static double LRT(ModelSt *model0, ModelSt *model1)
 {
     double delta;
@@ -713,11 +737,12 @@ static double LRT(ModelSt *model0, ModelSt *model1)
     else {
         printf("\n   P-value =  %f", prob);
     }
+
     return prob;
 }
 
 /******************* LRTmix ******************************/
-/* peforms a likelihood ratio test and uses mixed chi2*/
+/* performs a likelihood ratio test and uses mixed chi2*/
 static double LRTmix(ModelSt *model0, ModelSt *model1)
 {
     double delta, prob;
@@ -730,10 +755,10 @@ static double LRTmix(ModelSt *model0, ModelSt *model1)
     }
     else {
         if (df == 1) {
-            prob = ChiSquare(delta,df)/2;
+            prob = ChiSquare(delta, df)/2;
         }
         else {
-            prob = (ChiSquare(delta,df-1) + ChiSquare(delta,df)) / 2;
+            prob = (ChiSquare(delta, df-1) + ChiSquare(delta, df)) / 2;
         }
     }
     printf("\n   Null model = %-9.9s\t\t  -lnL0 = %.4f", model0->name, model0->ln);
@@ -749,6 +774,7 @@ static double LRTmix(ModelSt *model0, ModelSt *model1)
     else {
         printf("\n   P-value =  %f", prob);
     }
+
     return prob;
 }
 
@@ -759,6 +785,7 @@ float TestEqualBaseFrequencies(ModelSt *model0, ModelSt *model1)
 
     printf("\n Equal base frequencies");
     P = LRT(model0, model1);
+
     return P;
 }
 
@@ -769,6 +796,7 @@ float TestTiequalsTv(ModelSt *model0, ModelSt *model1)
 
     printf("\n Ti=Tv");
     P = LRT(model0, model1);
+
     return P;
 }
 
@@ -779,6 +807,7 @@ float TestEqualTiAndEqualTvRates (ModelSt *model0, ModelSt *model1)
 
     printf("\n Unequal Tv and unequal Ti");
     P = LRT(model0, model1);
+
     return P;
 }
 
@@ -794,6 +823,7 @@ float TestEqualSiteRates (ModelSt *model0, ModelSt *model1)
     else {
         P = LRT(model0, model1);
     }
+
     return P;
 }
 
@@ -809,6 +839,7 @@ float TestInvariableSites (ModelSt *model0, ModelSt *model1)
     else {
         P = LRT(model0, model1);
     }
+
     return P;
 }
 
@@ -904,6 +935,7 @@ float Normalz (float z)        /*VAR returns cumulative probability from -oo to 
                 +0.000535310849) * y +0.999936657524;
         }
     }
+
     return (z > 0.0 ? ((x + 1.0) * 0.5) : ((1.0 - x) * 0.5));
 }
 
@@ -914,18 +946,30 @@ static void RatioCalc()
     int df;
 
     printf("\nPlease, input the POSITIVE log likelihood score corresponding to \nthe null model> ");
-    scanf("%f", &score1);
+    if (scanf("%f", &score1) != 1) {
+        fprintf (stderr, "\nError: could not read value using scanf()");
+        exit (1);
+    }
     while (score1 < 0) {
         printf("\nBad Input: the program doesn't accept negative likelihood scores");
         printf("\n\nPlease, input the POSITIVE log likelihood score corresponding to \nthe null model> ");
-        scanf("%f", &score1);
+        if (scanf("%f", &score1) != 1) {
+            fprintf (stderr, "\nError: could not read value using scanf()");
+            exit (1);
+        }
     }
     printf("\nPlease, input the POSITIVE log likelihood score corresponding to \nthe alternative model> ");
-    scanf("%f", &score2);
+    if (scanf("%f", &score2) != 1) {
+        fprintf (stderr, "\nError: could not read value using scanf()");
+        exit (1);
+    }
     while (score2 < 0) {
         printf("Bad Input: the program doesn't accept negative likelihood scores");
         printf("\nPlease, input the POSITIVE log likelihood score corresponding to \nthe alternative model> ");
-        scanf("%f", &score2);
+        if (scanf("%f", &score2) != 1) {
+            fprintf (stderr, "\nError: could not read value using scanf()");
+            exit (1);
+        }
     }
     if (score1 < score2) {
         printf("\n\nIncorrect input: the positive likelihood of the null model cannot be smaller than the positive likelihood of the alternative model.");
@@ -933,14 +977,20 @@ static void RatioCalc()
         exit(0);
     }
     printf("\nPlease, input the number of degrees of freedom> ");
-    scanf("%d", &df);
+    if (scanf("%d", &df) != 1) {
+        fprintf (stderr, "\nError: could not read value using scanf()");
+        exit (1);
+    }
     while (df < 1) {
         printf("\nThe number of degrees of freedom should be at least 1");
         printf("\nPlease, input the number of degrees of freedom> ");
-        scanf("%d", &df);
+        if (scanf("%d", &df) != 1) {
+            fprintf (stderr, "\nError: could not read value using scanf()");
+            exit (1);
+        }
     }
     ratio = 2*(score1-score2);
-    prob = ChiSquare(ratio,df);
+    prob = ChiSquare(ratio, df);
     printf("\n\n_________________________ Results of Ratio Calculator _______________________\n");
     printf("\nThe ratio is %f ", ratio);
     printf("\n\nThe probability of observing this ratio likelihood test statistic under a correct null model is %f\n", prob);
@@ -1057,52 +1107,53 @@ void AkaikeWeights ()
 
     This method is completely brute force (See Java version)
 
-    Assumes TrN y TIM estimate only Rb, Re
-    K81 estimates no R parameter
-    TVM estimates only Ra, Rc, Rd
-    GTR y SIM estimate Ra, Rb, Rc, Rd, Re
+    Assumes TrN and TIM estimate only rAG, rCT
+    K81 estimates no rXY parameter
+    TVM estimates only rAC, rAT, rCG
+    GTR and SIM estimate rAC, rAG, rAT, rCG, rCT
 */
-
 void ModelAveraging()
 {
     double minWeightToAverage;
-    double ifA, ifC, ifG, ifT, ititv, iRa, iRb, iRc, iRd, iRe, ipinvI, ialphaG, ipinvIG, ialphaIG;
-    double wfA, wfC, wfG, wfT, wtitv, wRa, wRb, wRc, wRd, wRe, wpinvI, walphaG, wpinvIG, walphaIG;
+    double ipiA, ipiC, ipiG, ipiT, ititv, irAC, irAG, irAT, irCG, irCT, irGT, ipinvI, ialphaG, ipinvIG, ialphaIG;
+    double wpiA, wpiC, wpiG, wpiT, wtitv, wrAC, wrAG, wrAT, wrCG, wrCT, wrGT, wpinvI, walphaG, wpinvIG, walphaIG;
 
-    /* which index (1-167) for scores */
-    int efA[] = {14,20,27,34,58,65,73,81,122,133,145,157};
-    int efC[] = {15,21,28,35,59,66,74,82,123,134,146,158};
-    int efG[] = {16,22,29,36,60,67,75,83,124,135,147,159};
-    int efT[] = {17,23,30,37,61,68,76,84,125,136,148,160};
-    int etitv[] = {42,45,49,53,62,69,77,85};
-    int eRa[] = {90,97,105,113,126,137,149,161};
-    int eRb[] = {91,98,106,114,127,138,150,162};
-    int eRc[] = {92,99,107,115,128,139,151,163};
-    int eRd[] = {93,100,108,116,129,140,152,164};
-    int eRe[] = {94,101,109,117,130,141,153,165};
-    int epinvI[] = {4,24,46,70,102,142};
-    int ealphaG[] = {7,31,50,78,110,154};
-    int epinvIG[] = {4,10,24,38,46,54,70,86,102,118,142,166};
-    int ealphaIG[] = {7,11,31,39,50,55,78,87,110,119,154,167};
+    /* which index (1-175) for scores */
+    int epiA[] = {14, 20, 27, 34, 58, 65, 73, 81, 126, 138, 151, 164};
+    int epiC[] = {15, 21, 28, 35, 59, 66, 74, 82, 127, 139, 152, 165};
+    int epiG[] = {16, 22, 29, 36, 60, 67, 75, 83, 128, 140, 153, 166};
+    int epiT[] = {17, 23, 30, 37, 61, 68, 76, 84, 129, 141, 154, 167};
+    int etitv[] = {42, 45, 49, 53, 62, 69, 77, 85};
+    int erAC[] = {90, 98, 107, 116, 130, 142, 155, 168};
+    int erAG[] = {91, 99, 108, 117, 131, 143, 156, 169};
+    int erAT[] = {92, 100, 109, 118, 132, 144, 157, 170};
+    int erCG[] = {93, 101, 110, 119, 133, 145, 158, 171};
+    int erCT[] = {94, 102, 111, 120, 134, 146, 159, 172};
+    int erGT[] = {95, 103, 112, 121, 135, 147, 160, 173};
+    int epinvI[] = {4, 24, 46, 70, 104, 148};
+    int ealphaG[] = {7, 31, 50, 78, 113, 161};
+    int epinvIG[] = {4, 10, 24, 38, 46, 54, 70, 86, 104, 122, 148, 174};
+    int ealphaIG[] = {7, 11, 31, 39, 50, 55, 78, 87, 113, 123, 161, 175};
 
     /* which index (1-23) for models containing the parameter  */
-    int mfA[] = {4,5,6,7,12,13,14,15,20,21,22,23};
-    int mfC[] = {4,5,6,7,12,13,14,15,20,21,22,23};
-    int mfG[] = {4,5,6,7,12,13,14,15,20,21,22,23};
-    int mfT[] = {4,5,6,7,12,13,14,15,20,21,22,23};
-    int mtitv[] = {8,9,10,11,12,13,14,15};
-    int mRa[] = {16,17,18,19,20,21,22,23};
-    int mRb[] = {16,17,18,19,20,21,22,23};
-    int mRc[] = {16,17,18,19,20,21,22,23};
-    int mRd[] = {16,17,18,19,20,21,22,23};
-    int mRe[] = {16,17,18,19,20,21,22,23};
-    int mpinvI[] = {1,5,9,13,17,21};
-    int malphaG[] = {2,6,10,14,18,22};
-    int mpinvIG[] = {1,3,5,7,9,11,13,15,17,19,21,23};
-    int malphaIG[] = {2,3,6,7,10,11,14,15,18,19,22,23};
+    int mpiA[] = {4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23};
+    int mpiC[] = {4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23};
+    int mpiG[] = {4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23};
+    int mpiT[] = {4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23};
+    int mtitv[] = {8, 9, 10, 11, 12, 13, 14, 15};
+    int mrAC[] = {16, 17, 18, 19, 20, 21, 22, 23};
+    int mrAG[] = {16, 17, 18, 19, 20, 21, 22, 23};
+    int mrAT[] = {16, 17, 18, 19, 20, 21, 22, 23};
+    int mrCG[] = {16, 17, 18, 19, 20, 21, 22, 23};
+    int mrCT[] = {16, 17, 18, 19, 20, 21, 22, 23};
+    int mrGT[] = {16, 17, 18, 19, 20, 21, 22, 23};
+    int mpinvI[] = {1, 5, 9, 13, 17, 21};
+    int malphaG[] = {2, 6, 10, 14, 18, 22};
+    int mpinvIG[] = {1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23};
+    int malphaIG[] = {2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23};
 
-    ifA = ifC = ifG = ifT = ititv = iRa = iRb = iRc = iRd = iRe = ipinvI = ialphaG = ipinvIG = ialphaIG = 0;
-    wfA = wfC = wfG = wfT = wtitv = wRa = wRb = wRc = wRd = wRe = wpinvI = walphaG = wpinvIG = walphaIG = 0;
+    ipiA = ipiC = ipiG = ipiT = ititv = irAC = irAG = irAT = irCG = irCT = irGT = ipinvI = ialphaG = ipinvIG = ialphaIG = 0;
+    wpiA = wpiC = wpiG = wpiT = wtitv = wrAC = wrAG = wrAT = wrCG = wrCT = wrGT = wpinvI = walphaG = wpinvIG = walphaIG = 0;
 
     if (averagingConfidenceInterval < 1) {
         minWeightToAverage = FindMinWeightToAverage ();
@@ -1113,20 +1164,21 @@ void ModelAveraging()
     }
 
     /* calculate importances and model-averaged estimates */
-    AverageEstimates ("fA",12, mfA, efA, &ifA, &wfA, minWeightToAverage);
-    AverageEstimates ("fC",12, mfC, efC, &ifC, &wfC, minWeightToAverage);
-    AverageEstimates ("fG",12, mfG, efG, &ifG, &wfG, minWeightToAverage);
-    AverageEstimates ("fT",12, mfT, efT, &ifT, &wfT, minWeightToAverage);
-    AverageEstimates ("titv", 8, mtitv, etitv, &ititv, &wtitv, minWeightToAverage);
-    AverageEstimates ("Ra",8, mRa, eRa, &iRa, &wRa, minWeightToAverage);
-    AverageEstimates ("Rb",8, mRb, eRb, &iRb, &wRb, minWeightToAverage);
-    AverageEstimates ("Rc",8, mRc, eRc, &iRc, &wRc, minWeightToAverage);
-    AverageEstimates ("Rd",8, mRd, eRd, &iRd, &wRd, minWeightToAverage);
-    AverageEstimates ("Re",8, mRe, eRe, &iRe, &wRe, minWeightToAverage);
-    AverageEstimates ("pinv(I)",6, mpinvI, epinvI, &ipinvI, &wpinvI, minWeightToAverage);
-    AverageEstimates ("alpha(G)",6, malphaG, ealphaG, &ialphaG, &walphaG, minWeightToAverage);
-    AverageEstimates ("pinv(IG)",12, mpinvIG, epinvIG, &ipinvIG, &wpinvIG, minWeightToAverage);
-    AverageEstimates ("alpha(IG)",12, malphaIG, ealphaIG, &ialphaIG, &walphaIG, minWeightToAverage);
+    AverageEstimates (12, mpiA, epiA, &ipiA, &wpiA, minWeightToAverage); /*piA*/
+    AverageEstimates (12, mpiC, epiC, &ipiC, &wpiC, minWeightToAverage); /*piC*/
+    AverageEstimates (12, mpiG, epiG, &ipiG, &wpiG, minWeightToAverage); /*piG*/
+    AverageEstimates (12, mpiT, epiT, &ipiT, &wpiT, minWeightToAverage); /*piT*/
+    AverageEstimates (8, mtitv, etitv, &ititv, &wtitv, minWeightToAverage); /*titv*/
+    AverageEstimates (8, mrAC, erAC, &irAC, &wrAC, minWeightToAverage); /*rAC*/
+    AverageEstimates (8, mrAG, erAG, &irAG, &wrAG, minWeightToAverage); /*rAG*/
+    AverageEstimates (8, mrAT, erAT, &irAT, &wrAT, minWeightToAverage); /*rAT*/
+    AverageEstimates (8, mrCG, erCG, &irCG, &wrCG, minWeightToAverage); /*rCG*/
+    AverageEstimates (8, mrCT, erCT, &irCT, &wrCT, minWeightToAverage); /*rCT*/
+    AverageEstimates (8, mrGT, erGT, &irGT, &wrGT, minWeightToAverage); /*rGT*/
+    AverageEstimates (6, mpinvI, epinvI, &ipinvI, &wpinvI, minWeightToAverage); /*pinv(I)*/
+    AverageEstimates (6, malphaG, ealphaG, &ialphaG, &walphaG, minWeightToAverage); /*alpha(G)*/
+    AverageEstimates (12, mpinvIG, epinvIG, &ipinvIG, &wpinvIG, minWeightToAverage); /*pinv(IG)*/
+    AverageEstimates (12, malphaIG, ealphaIG, &ialphaIG, &walphaIG, minWeightToAverage); /*alpha(IG)*/
 
     /* print results */
     printf ("\n\n\n\n* MODEL AVERAGING AND PARAMETER IMPORTANCE (using Akaike Weights)");
@@ -1136,26 +1188,27 @@ void ModelAveraging()
     else {
         fprintf (stdout, "\n    Including only the best %d models within the aproximate %4.2f (%6.4f)\n    confidence interval", lastModelConfidence+1, averagingConfidenceInterval, cumConfidenceWeight);
         fprintf (stdout, "\n      minimum weight to average is %6.4f", minWeightToAverage);
-        fprintf (stdout, "\n      weights are reescaled by the interval cumulative weight (%6.4f)", cumConfidenceWeight);
+        fprintf (stdout, "\n      weights are rescaled by the interval cumulative weight (%6.4f)", cumConfidenceWeight);
     }
 
     printf ("\n\n\t\t\t\t\tModel-averaged");    /*Att göra: fixa till output för printet nedan*/
     printf ("\nParameter\t\tImportance\testimates");
     printf ("\n----------------------------------------------------");
-    printf ("\nfA\t\t\t%6.4f\t\t%11s",ifA, CheckNA(wfA));
-    printf ("\nfC\t\t\t%6.4f\t\t%11s",ifC, CheckNA(wfC));
-    printf ("\nfG\t\t\t%6.4f\t\t%11s",ifG, CheckNA(wfG));
-    printf ("\nfT\t\t\t%6.4f\t\t%11s",ifT, CheckNA(wfT));
-    printf ("\nTiTv\t\t\t%6.4f\t\t%11s",ititv, CheckNA(wtitv));
-    printf ("\nrAC\t\t\t%6.4f\t\t%11s",iRa, CheckNA(wRa));
-    printf ("\nrAG\t\t\t%6.4f\t\t%11s",iRb, CheckNA(wRb));
-    printf ("\nrAT\t\t\t%6.4f\t\t%11s",iRc, CheckNA(wRc));
-    printf ("\nrCG\t\t\t%6.4f\t\t%11s",iRd, CheckNA(wRd));
-    printf ("\nrCT\t\t\t%6.4f\t\t%11s",iRe, CheckNA(wRe));
-    printf ("\npinv(I)\t\t\t%6.4f\t\t%11s",ipinvI, CheckNA(wpinvI));
-    printf ("\nalpha(G)\t\t%6.4f\t\t%11s",ialphaG, CheckNA(walphaG));
-    printf ("\npinv(I+IG)\t\t%6.4f\t\t%11s",ipinvIG, CheckNA(wpinvIG));
-    printf ("\nalpha(G+IG)\t\t%6.4f\t\t%11s",ialphaIG, CheckNA(walphaIG));
+    printf ("\npiA\t\t\t%6.4f\t\t%11s", ipiA, CheckNA(wpiA));
+    printf ("\npiC\t\t\t%6.4f\t\t%11s", ipiC, CheckNA(wpiC));
+    printf ("\npiG\t\t\t%6.4f\t\t%11s", ipiG, CheckNA(wpiG));
+    printf ("\npiT\t\t\t%6.4f\t\t%11s", ipiT, CheckNA(wpiT));
+    printf ("\nTiTv\t\t\t%6.4f\t\t%11s", ititv, CheckNA(wtitv));
+    printf ("\nrAC\t\t\t%6.4f\t\t%11s", irAC, CheckNA(wrAC));
+    printf ("\nrAG\t\t\t%6.4f\t\t%11s", irAG, CheckNA(wrAG));
+    printf ("\nrAT\t\t\t%6.4f\t\t%11s", irAT, CheckNA(wrAT));
+    printf ("\nrCG\t\t\t%6.4f\t\t%11s", irCG, CheckNA(wrCG));
+    printf ("\nrCT\t\t\t%6.4f\t\t%11s", irCT, CheckNA(wrCT));
+    printf ("\nrGT\t\t\t%6.4f\t\t%11s", irGT, CheckNA(wrGT));
+    printf ("\npinv(I)\t\t\t%6.4f\t\t%11s", ipinvI, CheckNA(wpinvI));
+    printf ("\nalpha(G)\t\t%6.4f\t\t%11s", ialphaG, CheckNA(walphaG));
+    printf ("\npinv(I+IG)\t\t%6.4f\t\t%11s", ipinvIG, CheckNA(wpinvIG));
+    printf ("\nalpha(G+IG)\t\t%6.4f\t\t%11s", ialphaIG, CheckNA(walphaIG));
     printf ("\n----------------------------------------------------");
 
     printf ("\nNote: values have been rounded.");
@@ -1166,15 +1219,15 @@ void ModelAveraging()
 
 }
 
+
 /************** AverageEstimates **********************/
 /*
     Calculates parameter importance and averaged estimates
 */
-void AverageEstimates (char *whichParameter, int numModels, int *modelIndex, int *estimateIndex, double *importance, double *averagedEstimate, double minWeightToAverage)
+void AverageEstimates (int numModels, int *modelIndex, int *estimateIndex, double *importance, double *averagedEstimate, double minWeightToAverage)
 {
     int i;
 
-    whichParameter = whichParameter; /* just to avoid warnings */
     for (i=0; i < numModels; i++) {
         if (wAIC[modelIndex[i]] < minWeightToAverage) {
             continue;
@@ -1200,9 +1253,10 @@ void AverageEstimates (char *whichParameter, int numModels, int *modelIndex, int
 double FindMinWeightToAverage ()
 {
     int i;
-    double minWeight,cumWeight;
+    double minWeight, cumWeight;
 
     cumWeight = 0;
+    minWeight = 0;
     for (i = 0; i < NUM_MODELS; i++) {
         cumWeight += wAIC[orderedAIC[i]];
         if (cumWeight > averagingConfidenceInterval) {
@@ -1212,6 +1266,7 @@ double FindMinWeightToAverage ()
             break;
         }
     }
+
     return minWeight;
 }
 
@@ -1255,53 +1310,81 @@ void AICfile()
 /*********************** AICCalc ***************************/
 /*Ask the user for likelihood scores and calculates their AIC */
 /*values, choosing the minimum. */
-void AICCalc()
+/*Andreas K's version Sept. 2018 */
+int AICCalc()
 {
     double ln[300];
     int n[300];
     double AIC[300];
-    double min_AIC;
+    int min_AIC;
     int i, number;
 
-    printf("\nEnter the number of likelihood scores you want to compare> ");
-    scanf("%d", &number);
-    for (i = 1; i <= number; i++) {
-        printf("\nEnter the positive likelihood score number %d> ", i);
-        scanf("%lf", &ln[i]);
-        printf("\nEnter the number of free parameters corresponding to the model \nrepresented by the score number %d> ", i);
-        scanf("%d", &n[i]);
-        if (ln[i] < 0 || n[i] < 0 || ln[i] == 0 || n[i] == 0) {
-            printf("\nThe program only admits positive likelihood scores or number of parameters.");
-            printf("\nEnter the positive likelihood score number %d", i);
-            scanf("%lf", &ln[i]);
+    while (1) {
+        fprintf(stderr,
+            "Enter the number of likelihood scores you want to compare> ");
+        if (scanf("%d", &number) != 1) {
+            perror("Error in scanf() call");
+            exit(EXIT_FAILURE);
         }
-        AIC[i] = 2*(ln[i] + n[i]);
+        else if (number > 0 && number < 300) {
+            break;
+        }
+        fprintf(stderr, "Invalid number, must be 1 or larger (but not as large as 300)\n");
     }
-    min_AIC = AIC[1];
-    for (i = 1; i <= number; i++) {
-        if (AIC[i] <= min_AIC) {
-            min_AIC = AIC[i];
+    for (i = 0; i < number; i++) {
+        putchar('\n');
+        fprintf(stderr, "Enter the positive likelihood score number %d> ", i + 1);
+        if (scanf("%lf", &ln[i]) != 1) {
+            perror("Error in scanf()");
+            exit(EXIT_FAILURE);
+        }
+        fprintf(stderr,
+            "Enter the number of free parameters corresponding to the model "
+            "\nrepresented by the score number %d> ",
+            i + 1);
+        if (scanf("%d", &n[i]) != 1) {
+            perror("Error in scanf()");
+            exit(EXIT_FAILURE);
+        }
+        if (ln[i] <= 0 || n[i] <= 0) {
+            fputs("The program only admits positive likelihood scores or number "
+                "of parameters\n",
+                stderr);
+            fprintf(stderr, "Enter the positive likelihood score number %d", i + 1);
+        if (scanf("%lf", &ln[i]) != 1) {
+            perror("Error in scanf()");
+            exit(EXIT_FAILURE);
+            }
+        }
+        AIC[i] = 2 * (ln[i] + n[i]);
+    }
+    min_AIC = 0;
+    for (i = 1; i < number; i++) {
+        if (AIC[i] < AIC[min_AIC]) {
+            min_AIC = i;
         }
     }
-    printf("\n\n_________________________ Results of AIC Calculator _______________________\n");
-    printf("\nNumber\t\tLikelihood\t\tParameters\t\tAIC\n");
-    for (i = 1; i <= number; i++) {
-        printf("%2d\t%15.5f\t%5d\t%15.5f\n", i, ln[i], n[i], AIC[i]);
+    puts("\n");
+    puts("_________________________ "
+        "Results of AIC Calculator "
+        "_______________________");
+    puts("\nNumber\t\tLikelihood\t\tParameters\t\tAIC");
+    for (i = 0; i < number; i++) {
+        printf("%2d\t%15.5f\t%5d\t%15.5f\n", i + 1, ln[i], n[i], AIC[i]);
     }
-    for (i = 1; i <= number; i++) {
-        if (AIC[i] == min_AIC) {
-            printf("\n A minimum AIC value (%f) corresponds to the score number %d (%f)\n",  min_AIC, i, ln[i]);
-        }
-    }
-    printf("\nDone.\n");
-    exit(0);
+    printf("\n A minimum AIC value (%f) corresponds to the score number %d "
+        "(%f)\n",
+        AIC[min_AIC], min_AIC + 1, ln[min_AIC]);
+    puts("\nDone.");
+
+    return EXIT_SUCCESS;
 }
 
 /********************* PrintPaupBlock ************************/
 /* Prints a block of paup commands for appending to the data file */
 static void PrintPaupBlock (int ishLRT)
 {
-    fT = 1 - (fA + fC + fG);
+    piT = 1 - (piA + piC + piG);
     printf("\n\n\n--\n\nPAUP* Commands Block:");
     printf(" If you want to implement the previous estimates as likelihod settings in PAUP*,");
     printf(" attach the next block of commands after the data in your PAUP file:\n");
@@ -1317,21 +1400,21 @@ static void PrintPaupBlock (int ishLRT)
     printf("\nBEGIN PAUP;");
     printf("\n\tLset");
     printf("  Base=");
-    if (fA == fC && fA ==fG && fA == fT) {
+    if (piA == piC && piA == piG && piA == piT) {
         printf("equal");
     }
     else {
-        printf("(%.4f %.4f %.4f)",fA,fC,fG);
+        printf("(%.4f %.4f %.4f)", piA, piC, piG);
     }
     /* Substitution rates */
-    if (Ra == Rb && Ra == Rc && Ra == Rd && Ra == Re && Ra == Rf && TiTv == 0) {
+    if (rAC == rAG && rAC == rAT && rAC == rCG && rAC == rCT && rAC == rGT && TiTv == 0) {
         printf("  Nst=1");
     }
     else if (TiTv != 0) {
         printf("  Nst=2  TRatio=%.4f", TiTv);
     }
     else {
-        printf("  Nst=6  Rmat=(%.9f %.9f %.9f %.9f %.9f)", Ra, Rb, Rc, Rd, Re);
+        printf("  Nst=6  Rmat=(%.9f %.9f %.9f %.9f %.9f)", rAC, rAG, rAT, rCG, rCT);
     }
     /* Rate variation */
     printf("  Rates=");
@@ -1357,7 +1440,7 @@ static void PrintPaupBlock (int ishLRT)
 /* Prints a block of MrBayes commands for appending to the data file */
 static void PrintMbBlock (int ishLRT)
 {
-    fT = 1 - (fA + fC + fG);
+    piT = 1 - (piA + piC + piG);
     printf("\n\n\nMrBayes Commands Block:");
     printf(" If you want to implement a \"best\" model in MrBayes,");
     printf(" attach the next block of commands after the data in your NEXUS file:\n");
@@ -1377,7 +1460,7 @@ static void PrintMbBlock (int ishLRT)
     printf("\nBEGIN MRBAYES;\n");
     printf("\n\tLset");
     /* Substitution rates */
-    if (Ra == Rb && Ra == Rc && Ra == Rd && Ra == Re && Ra == Rf && TiTv == 0) {
+    if (rAC == rAG && rAC == rAT && rAC == rCG && rAC == rCT && rAC == rGT && TiTv == 0) {
         printf("  nst=1");
     }
     else if (TiTv != 0) { /*** Att göra: Monitor this. Might be "yes" also for nst=6! **/
@@ -1404,7 +1487,7 @@ static void PrintMbBlock (int ishLRT)
     }
     printf(";\n");
     /* Base frequencies */
-    if (fA == fC && fA == fG && fA == fT) {
+    if (piA == piC && piA == piG && piA == piT) {
         printf("\tPrset statefreqpr=fixed(equal);");
     }
     else {
@@ -1435,7 +1518,7 @@ static void Output(char *selection, float value)
 {
     int i, numK;
 
-    fT = 1 - (fA + fG + fC);
+    piT = 1 - (piA + piG + piC);
     for (i = 0; i < NUM_MODELS; i++) {
         if (!strcmp (selection, model[i].name)) {
             theln = model[i].ln;
@@ -1454,17 +1537,17 @@ static void Output(char *selection, float value)
         }
     }
     printf("\n   Base frequencies: ");
-    if (fA == fC && fA == fG && fA == fT) {
+    if (piA == piC && piA == piG && piA == piT) {
         printf("\n     Equal frequencies");
     }
     else {
-        printf("\n     freqA = \t%7.4f", fA);
-        printf("\n     freqC = \t%7.4f", fC);
-        printf("\n     freqG = \t%7.4f", fG);
-        printf("\n     freqT = \t%7.4f", fT);
+        printf("\n     freqA = \t%7.4f", piA);
+        printf("\n     freqC = \t%7.4f", piC);
+        printf("\n     freqG = \t%7.4f", piG);
+        printf("\n     freqT = \t%7.4f", piT);
     }
     printf("\n   Substitution model: ");
-    if (Ra == Rb && Ra == Rc && Ra == Rd && Ra == Re && Ra == Rf && TiTv == 0) {
+    if (rAC == rAG && rAC == rAT && rAC == rCG && rAC == rCT && rAC == rGT && TiTv == 0) {
         printf("\n     All rates equal");
     }
     else if (TiTv != 0) {
@@ -1472,12 +1555,12 @@ static void Output(char *selection, float value)
     }
     else {
         printf("\n     Rate matrix");
-        printf("\n     R(a) [A-C] = \t%7.4f", Ra);
-        printf("\n     R(b) [A-G] = \t%7.4f", Rb);
-        printf("\n     R(c) [A-T] = \t%7.4f", Rc);
-        printf("\n     R(d) [C-G] = \t%7.4f", Rd);
-        printf("\n     R(e) [C-T] = \t%7.4f", Re);
-        printf("\n     R(f) [G-T] = \t%7.4f", 1.0);
+        printf("\n     rAC = \t%7.4f", rAC);
+        printf("\n     rAG = \t%7.4f", rAG);
+        printf("\n     rAT = \t%7.4f", rAT);
+        printf("\n     rCG = \t%7.4f", rCG);
+        printf("\n     rCT = \t%7.4f", rCT);
+        printf("\n     rGT = \t%7.4f", rGT);
     }
     printf("\n   Among-site rate variation");
     if (pinv == 0) {
@@ -1503,9 +1586,9 @@ static void Output(char *selection, float value)
 static void SetModel(char *selection)
 {
     /* Default parameter estimates for the selected model (JC)*/
-    fA = fC = fG = fT = 0.25;
+    piA = piC = piG = piT = 0.25;
     TiTv = 0;
-    Ra = Rb = Rc = Rd = Re = Rf = 1.0;
+    rAC = rAG = rAT = rCG = rCT = rGT = 1.0;
     shape = 0.0;
     pinv = 0.0;
     if (!strcmp (selection, "JCI")) {
@@ -1519,30 +1602,30 @@ static void SetModel(char *selection)
         shape = score[11];
     }
     else if (!strcmp (selection, "F81")) {
-        fA = score[14];
-        fC = score[15];
-        fG = score[16];
-        fT = score[17];
+        piA = score[14];
+        piC = score[15];
+        piG = score[16];
+        piT = score[17];
     }
     else if (!strcmp (selection, "F81+I")) {
-        fA = score[20];
-        fC = score[21];
-        fG = score[22];
-        fT = score[23];
+        piA = score[20];
+        piC = score[21];
+        piG = score[22];
+        piT = score[23];
         pinv = score[24];
     }
     else if (!strcmp (selection, "F81+G")) {
-        fA = score[27];
-        fC = score[28];
-        fG = score[29];
-        fT = score[30];
+        piA = score[27];
+        piC = score[28];
+        piG = score[29];
+        piT = score[30];
         shape = score[31];
     }
     else if (!strcmp (selection, "F81+I+G")) {
-        fA = score[34];
-        fC = score[35];
-        fG = score[36];
-        fT = score[37];
+        piA = score[34];
+        piC = score[35];
+        piG = score[36];
+        piT = score[37];
         pinv = score[38];
         shape = score[39];
     }
@@ -1563,116 +1646,124 @@ static void SetModel(char *selection)
         shape = score[55];
     }
     else if (!strcmp (selection, "HKY")) {
-        fA = score[58];
-        fC = score[59];
-        fG = score[60];
-        fT = score[61];
+        piA = score[58];
+        piC = score[59];
+        piG = score[60];
+        piT = score[61];
         TiTv = score[62];
     }
     else if (!strcmp (selection, "HKY+I")) {
-        fA = score[65];
-        fC = score[66];
-        fG = score[67];
-        fT = score[68];
+        piA = score[65];
+        piC = score[66];
+        piG = score[67];
+        piT = score[68];
         TiTv = score[69];
         pinv = score[70];
     }
     else if (!strcmp (selection, "HKY+G")) {
-        fA = score[73];
-        fC = score[74];
-        fG = score[75];
-        fT = score[76];
+        piA = score[73];
+        piC = score[74];
+        piG = score[75];
+        piT = score[76];
         TiTv = score[77];
         shape = score[78];
         }
     else if (!strcmp (selection, "HKY+I+G")) {
-        fA = score[81];
-        fC = score[82];
-        fG = score[83];
-        fT = score[84];
+        piA = score[81];
+        piC = score[82];
+        piG = score[83];
+        piT = score[84];
         TiTv = score[85];
         pinv = score[86];
         shape = score[87];
         }
     else if (!strcmp (selection, "SYM")) {
-        Ra = score[90];
-        Rb = score[91];
-        Rc = score[92];
-        Rd = score[93];
-        Re = score[94];
+        rAC = score[90];
+        rAG = score[91];
+        rAT = score[92];
+        rCG = score[93];
+        rCT = score[94];
+        rGT = score[95];
     }
     else if (!strcmp (selection, "SYM+I")) {
-        Ra = score[97];
-        Rb = score[98];
-        Rc = score[99];
-        Rd = score[100];
-        Re = score[101];
-        pinv = score[102];
+        rAC = score[98];
+        rAG = score[99];
+        rAT = score[100];
+        rCG = score[101];
+        rCT = score[102];
+        rGT = score[103];
+        pinv = score[104];
     }
     else if (!strcmp (selection, "SYM+G")) {
-        Ra = score[105];
-        Rb = score[106];
-        Rc = score[107];
-        Rd = score[108];
-        Re = score[109];
-        shape = score[110];
+        rAC = score[107];
+        rAG = score[108];
+        rAT = score[109];
+        rCG = score[110];
+        rCT = score[111];
+        rGT = score[112];
+        shape = score[113];
         }
     else if (!strcmp (selection, "SYM+I+G")) {
-        Ra = score[113];
-        Rb = score[114];
-        Rc = score[115];
-        Rd = score[116];
-        Re = score[117];
-        pinv = score[118];
-        shape = score[119];
+        rAC = score[116];
+        rAG = score[117];
+        rAT = score[118];
+        rCG = score[119];
+        rCT = score[120];
+        rGT = score[121];
+        pinv = score[122];
+        shape = score[123];
     }
     else if (!strcmp (selection, "GTR")) {
-        fA = score[122];
-        fC = score[123];
-        fG = score[124];
-        fT = score[125];
-        Ra = score[126];
-        Rb = score[127];
-        Rc = score[128];
-        Rd = score[129];
-        Re = score[130];
+        piA = score[126];
+        piC = score[127];
+        piG = score[128];
+        piT = score[129];
+        rAC = score[130];
+        rAG = score[131];
+        rAT = score[132];
+        rCG = score[133];
+        rCT = score[134];
+        rGT = score[135];
     }
     else if (!strcmp (selection, "GTR+I")) {
-        fA = score[133];
-        fC = score[134];
-        fG = score[135];
-        fT = score[136];
-        Ra = score[137];
-        Rb = score[138];
-        Rc = score[139];
-        Rd = score[140];
-        Re = score[141];
-        pinv = score[142];
+        piA = score[138];
+        piC = score[139];
+        piG = score[140];
+        piT = score[141];
+        rAC = score[142];
+        rAG = score[143];
+        rAT = score[144];
+        rCG = score[145];
+        rCT = score[146];
+        rGT = score[147];
+        pinv = score[148];
     }
     else if (!strcmp (selection, "GTR+G")) {
-        fA = score[145];
-        fC = score[146];
-        fG = score[147];
-        fT = score[148];
-        Ra = score[149];
-        Rb = score[150];
-        Rc = score[151];
-        Rd = score[152];
-        Re = score[153];
-        shape = score[154];
+        piA = score[151];
+        piC = score[152];
+        piG = score[153];
+        piT = score[154];
+        rAC = score[155];
+        rAG = score[156];
+        rAT = score[157];
+        rCG = score[158];
+        rCT = score[159];
+        rGT = score[160];
+        shape = score[161];
     }
     else if (!strcmp (selection, "GTR+I+G")) {
-        fA = score[157];
-        fC = score[158];
-        fG = score[159];
-        fT = score[160];
-        Ra = score[161];
-        Rb = score[162];
-        Rc = score[163];
-        Rd = score[164];
-        Re = score[165];
-        pinv = score[166];
-        shape = score[167];
+        piA = score[164];
+        piC = score[165];
+        piG = score[166];
+        piT = score[167];
+        rAC = score[168];
+        rAG = score[169];
+        rAT = score[170];
+        rCG = score[171];
+        rCT = score[172];
+        rGT = score[173];
+        pinv = score[174];
+        shape = score[175];
     }
 }
 
@@ -1682,39 +1773,39 @@ void hLRT()
 {
     if (TestEqualBaseFrequencies (JC, F81) < alpha) { /* 1,2 */
         if (TestTiequalsTv (F81, HKY) < alpha) { /* 3,4 */
-            if (TestEqualTiAndEqualTvRates (HKY,GTR) < alpha) { /* 5,6 */
+            if (TestEqualTiAndEqualTvRates (HKY, GTR) < alpha) { /* 5,6 */
                 if (TestEqualSiteRates (GTR, GTRG) < alpha) { /* 7, 8 */
                     if (TestInvariableSites (GTRG, GTRIG) < alpha) { /*  9,10  */
-                        strcpy(modelhLRT,"GTR+I+G"); /* 12 */
+                        strcpy(modelhLRT, "GTR+I+G"); /* 12 */
                     }
                     else {
-                        strcpy(modelhLRT,"GTR+G"); /* 11 */
+                        strcpy(modelhLRT, "GTR+G"); /* 11 */
                     }
                 }
                 else {
                     if (TestInvariableSites (GTR, GTRI) < alpha) { /* 13 14,  */
-                        strcpy(modelhLRT,"GTR+I"); /* 16 */
+                        strcpy(modelhLRT, "GTR+I"); /* 16 */
                     }
                     else {
-                        strcpy(modelhLRT,"GTR"); /* 15 */
+                        strcpy(modelhLRT, "GTR"); /* 15 */
                     }
                 }
             }
             else {
                 if (TestEqualSiteRates (HKY, HKYG) < alpha) { /* 17 , 18 */
                     if (TestInvariableSites (HKYG, HKYIG) < alpha) { /* 19 , 20 */
-                        strcpy(modelhLRT,"HKY+I+G"); /* 22 */
+                        strcpy(modelhLRT, "HKY+I+G"); /* 22 */
                     }
                     else {
-                        strcpy(modelhLRT,"HKY+G"); /* 21 */
+                        strcpy(modelhLRT, "HKY+G"); /* 21 */
                     }
                 }
                 else {
                     if (TestInvariableSites (HKY, HKYI) < alpha) { /*  23, 24 */
-                        strcpy(modelhLRT,"HKY+I"); /* 26 */
+                        strcpy(modelhLRT, "HKY+I"); /* 26 */
                     }
                     else {
-                        strcpy(modelhLRT,"HKY"); /* 25 */
+                        strcpy(modelhLRT, "HKY"); /* 25 */
                     }
                 }
             }
@@ -1722,18 +1813,18 @@ void hLRT()
         else {
             if (TestEqualSiteRates (F81, F81G) < alpha) { /* 27 , 28 */
                 if (TestInvariableSites (F81G, F81IG) < alpha) { /* 29 , 30 */
-                        strcpy(modelhLRT,"F81+I+G"); /* 32 */
+                        strcpy(modelhLRT, "F81+I+G"); /* 32 */
                 }
                 else {
-                    strcpy(modelhLRT,"F81+G"); /* 31 */
+                    strcpy(modelhLRT, "F81+G"); /* 31 */
                 }
             }
             else {
                 if (TestInvariableSites (F81, F81I) < alpha) { /* 33 , 34 */
-                    strcpy(modelhLRT,"F81+I"); /* 36 */
+                    strcpy(modelhLRT, "F81+I"); /* 36 */
                 }
                 else {
-                    strcpy(modelhLRT,"F81"); /* 35 */
+                    strcpy(modelhLRT, "F81"); /* 35 */
                 }
             }
         }
@@ -1743,36 +1834,36 @@ void hLRT()
             if (TestEqualTiAndEqualTvRates (K80, SYM) < alpha) { /* 39 , 40 */
                 if (TestEqualSiteRates (SYM, SYMG) < alpha) { /* 41 , 42 */
                     if (TestInvariableSites (SYMG, SYMIG) < alpha) { /*  43,  44*/
-                        strcpy(modelhLRT,"SYM+I+G"); /* 46 */
+                        strcpy(modelhLRT, "SYM+I+G"); /* 46 */
                     }
                     else {
-                        strcpy(modelhLRT,"SYM+G"); /* 45 */
+                        strcpy(modelhLRT, "SYM+G"); /* 45 */
                     }
                 }
                 else {
                     if (TestInvariableSites (SYM, SYMI) < alpha) { /* 47 , 48 */
-                        strcpy(modelhLRT,"SYM+I"); /* 50 */
+                        strcpy(modelhLRT, "SYM+I"); /* 50 */
                     }
                     else {
-                        strcpy(modelhLRT,"SYM"); /* 49 */
+                        strcpy(modelhLRT, "SYM"); /* 49 */
                     }
                 }
             }
             else {
                 if (TestEqualSiteRates (K80, K80G) < alpha) { /*  51, 52 */
                     if (TestInvariableSites (K80G, K80IG) < alpha) { /* 53 , 54 */
-                        strcpy(modelhLRT,"K80+I+G"); /* 56 */
+                        strcpy(modelhLRT, "K80+I+G"); /* 56 */
                     }
                     else {
-                        strcpy(modelhLRT,"K80+G"); /* 55 */
+                        strcpy(modelhLRT, "K80+G"); /* 55 */
                     }
                 }
                 else {
                     if (TestInvariableSites (K80, K80I) < alpha) { /*  57, 58 */
-                        strcpy(modelhLRT,"K80+I"); /* 60 */
+                        strcpy(modelhLRT, "K80+I"); /* 60 */
                     }
                     else {
-                        strcpy(modelhLRT,"K80"); /* 59 */
+                        strcpy(modelhLRT, "K80"); /* 59 */
                     }
                 }
             }
@@ -1780,18 +1871,18 @@ void hLRT()
         else {
             if (TestEqualSiteRates (JC, JCG) < alpha) { /* 61 ,  62*/
                 if (TestInvariableSites (JCG, JCIG) < alpha) { /* 63 , 64 */
-                    strcpy(modelhLRT,"JC+I+G"); /* 66 */
+                    strcpy(modelhLRT, "JC+I+G"); /* 66 */
                 }
                 else {
-                    strcpy(modelhLRT,"JC+G"); /* 65 */
+                    strcpy(modelhLRT, "JC+G"); /* 65 */
                 }
             }
             else {
                 if (TestInvariableSites (JC, JCI) < alpha) {/* 67, 68 */
-                    strcpy(modelhLRT,"JC+I"); /* 70 */
+                    strcpy(modelhLRT, "JC+I"); /* 70 */
                 }
                 else {
-                    strcpy(modelhLRT,"JC"); /* 69 */
+                    strcpy(modelhLRT, "JC"); /* 69 */
                 }
             }
         }
@@ -1806,18 +1897,18 @@ void hLRT2()
         if (TestEqualTiAndEqualTvRates (HKYIG, GTRIG) < alpha) { /*B*/
             if (TestEqualSiteRates (GTRI, GTRIG) < alpha) { /*C*/
                 if (TestInvariableSites (GTRG, GTRIG) < alpha) { /*D*/
-                    strcpy(modelhLRT2,"GTR+I+G");
+                    strcpy(modelhLRT2, "GTR+I+G");
                 }
                 else {
-                    strcpy(modelhLRT2,"GTR+G");
+                    strcpy(modelhLRT2, "GTR+G");
                 }
             }
             else {
                 if (TestInvariableSites (GTR, GTRI) < alpha) { /*E*/
-                    strcpy(modelhLRT2,"GTR+I");
+                    strcpy(modelhLRT2, "GTR+I");
                 }
                 else {
-                    strcpy(modelhLRT2,"GTR");
+                    strcpy(modelhLRT2, "GTR");
                 }
             }
         }
@@ -1825,36 +1916,36 @@ void hLRT2()
             if (TestTiequalsTv (F81IG, HKYIG) < alpha) { /*F*/
                 if (TestEqualSiteRates (HKYI, HKYIG) < alpha) { /*G*/
                     if (TestInvariableSites (HKYG, HKYIG) < alpha) { /*H*/
-                        strcpy(modelhLRT2,"HKY+I+G");
+                        strcpy(modelhLRT2, "HKY+I+G");
                     }
                     else {
-                        strcpy(modelhLRT2,"HKY+G");
+                        strcpy(modelhLRT2, "HKY+G");
                     }
                 }
                 else {
                     if (TestInvariableSites (HKY, HKYI) < alpha) { /*I*/
-                        strcpy(modelhLRT2,"HKY+I");
+                        strcpy(modelhLRT2, "HKY+I");
                     }
                     else {
-                        strcpy(modelhLRT2,"HKY");
+                        strcpy(modelhLRT2, "HKY");
                     }
                 }
             }
             else {
                 if (TestEqualSiteRates (F81I, F81IG) < alpha) { /*J*/
                     if (TestInvariableSites (F81G, F81IG) < alpha) { /*K*/
-                        strcpy(modelhLRT2,"F81+I+G");
+                        strcpy(modelhLRT2, "F81+I+G");
                     }
                     else {
-                        strcpy(modelhLRT2,"F81+G");
+                        strcpy(modelhLRT2, "F81+G");
                     }
                 }
                 else {
                     if (TestInvariableSites (F81, F81I) < alpha) { /*L*/
-                        strcpy(modelhLRT2,"F81+I");
+                        strcpy(modelhLRT2, "F81+I");
                     }
                     else {
-                        strcpy(modelhLRT2,"F81");
+                        strcpy(modelhLRT2, "F81");
                     }
                 }
             }
@@ -1864,18 +1955,18 @@ void hLRT2()
         if (TestEqualTiAndEqualTvRates (K80IG, SYMIG) < alpha) { /*M*/
             if (TestEqualSiteRates (SYMI, SYMIG) < alpha) { /*N*/
                 if (TestInvariableSites (SYMG, SYMIG) < alpha) { /*O*/
-                    strcpy(modelhLRT2,"SYM+I+G");
+                    strcpy(modelhLRT2, "SYM+I+G");
                 }
                 else {
-                    strcpy(modelhLRT2,"SYM+G");
+                    strcpy(modelhLRT2, "SYM+G");
                 }
             }
             else {
                 if (TestInvariableSites (SYM, SYMI) < alpha) { /*P*/
-                    strcpy(modelhLRT2,"SYM+I");
+                    strcpy(modelhLRT2, "SYM+I");
                 }
                 else {
-                    strcpy(modelhLRT2,"SYM");
+                    strcpy(modelhLRT2, "SYM");
                 }
             }
         }
@@ -1883,36 +1974,36 @@ void hLRT2()
             if (TestTiequalsTv (JCIG, K80IG) < alpha) { /*Q*/
                 if (TestEqualSiteRates (K80I, K80IG) < alpha) { /*R*/
                     if (TestInvariableSites (K80G, K80IG) < alpha) { /*S*/
-                        strcpy(modelhLRT2,"K80+I+G");
+                        strcpy(modelhLRT2, "K80+I+G");
                     }
                     else {
-                        strcpy(modelhLRT2,"K80+G");
+                        strcpy(modelhLRT2, "K80+G");
                     }
                 }
                 else {
                     if (TestInvariableSites (K80, K80I) < alpha) { /*T*/
-                        strcpy(modelhLRT2,"K80+I");
+                        strcpy(modelhLRT2, "K80+I");
                     }
                     else {
-                        strcpy(modelhLRT2,"K80");
+                        strcpy(modelhLRT2, "K80");
                     }
                 }
             }
             else {
                 if (TestEqualSiteRates (JCI, JCIG) < alpha) { /*U*/
                     if (TestInvariableSites (JCG, JCIG) < alpha) { /*V*/
-                        strcpy(modelhLRT2,"JC+I+G");
+                        strcpy(modelhLRT2, "JC+I+G");
                     }
                     else {
-                        strcpy(modelhLRT2,"JC+G");
+                        strcpy(modelhLRT2, "JC+G");
                     }
                 }
                 else {
                     if (TestInvariableSites (JC, JCI) < alpha) { /*X*/
-                        strcpy(modelhLRT2,"JC+I");
+                        strcpy(modelhLRT2, "JC+I");
                     }
                     else {
-                        strcpy(modelhLRT2,"JC");
+                        strcpy(modelhLRT2, "JC");
                     }
                 }
             }
@@ -1929,27 +2020,27 @@ void hLRT3()
             if (TestTiequalsTv (JCIG, K80IG) < alpha) { /*C*/
                 if (TestEqualTiAndEqualTvRates (K80IG, SYMIG) < alpha) { /*D*/
                     if (TestEqualBaseFrequencies (SYMIG, GTRIG) < alpha) { /*E*/
-                        strcpy(modelhLRT3,"GTR+I+G");
+                        strcpy(modelhLRT3, "GTR+I+G");
                     }
                     else {
-                        strcpy(modelhLRT3,"SYM+I+G");
+                        strcpy(modelhLRT3, "SYM+I+G");
                     }
                 }
                 else {
                     if (TestEqualBaseFrequencies (K80IG, HKYIG) < alpha) { /*F*/
-                        strcpy(modelhLRT3,"HKY+I+G");
+                        strcpy(modelhLRT3, "HKY+I+G");
                     }
                     else {
-                        strcpy(modelhLRT3,"K80+I+G");
+                        strcpy(modelhLRT3, "K80+I+G");
                     }
                 }
             }
             else {
                 if (TestEqualBaseFrequencies (JCIG, F81IG) < alpha) { /*G*/
-                    strcpy(modelhLRT3,"F81+I+G");
+                    strcpy(modelhLRT3, "F81+I+G");
                 }
                 else {
-                    strcpy(modelhLRT3,"JC+I+G");
+                    strcpy(modelhLRT3, "JC+I+G");
                 }
             }
         }
@@ -1957,27 +2048,27 @@ void hLRT3()
             if (TestTiequalsTv (JCG, K80G) < alpha) { /*H*/
                 if (TestEqualTiAndEqualTvRates (K80G, SYMG) < alpha) { /*I*/
                     if (TestEqualBaseFrequencies (SYMG, GTRG) < alpha) { /*J*/
-                        strcpy(modelhLRT3,"GTR+G");
+                        strcpy(modelhLRT3, "GTR+G");
                     }
                     else {
-                        strcpy(modelhLRT3,"SYM+G");
+                        strcpy(modelhLRT3, "SYM+G");
                     }
                 }
                 else {
                     if (TestEqualBaseFrequencies (K80G, HKYG) < alpha) { /*K*/
-                        strcpy(modelhLRT3,"HKY+G");
+                        strcpy(modelhLRT3, "HKY+G");
                     }
                     else {
-                        strcpy(modelhLRT3,"K80+G");
+                        strcpy(modelhLRT3, "K80+G");
                     }
                 }
             }
             else {
                 if (TestInvariableSites (JCG, F81G) < alpha) { /*L*/
-                    strcpy(modelhLRT3,"F81+G");
+                    strcpy(modelhLRT3, "F81+G");
                 }
                 else {
-                    strcpy(modelhLRT3,"JC+G");
+                    strcpy(modelhLRT3, "JC+G");
                 }
             }
         }
@@ -1987,27 +2078,27 @@ void hLRT3()
             if (TestTiequalsTv (JCI, K80I) < alpha) { /*N*/
                 if (TestEqualTiAndEqualTvRates (K80I, SYMI) < alpha) { /*O*/
                     if (TestEqualBaseFrequencies (SYMI, GTRI) < alpha) { /*P*/
-                        strcpy(modelhLRT3,"GTR+I");
+                        strcpy(modelhLRT3, "GTR+I");
                     }
                     else {
-                        strcpy(modelhLRT3,"SYM+I");
+                        strcpy(modelhLRT3, "SYM+I");
                     }
                 }
                 else {
                     if (TestEqualBaseFrequencies (K80I, HKYI) < alpha) { /*Q*/
-                        strcpy(modelhLRT3,"HKY+I");
+                        strcpy(modelhLRT3, "HKY+I");
                     }
                     else {
-                        strcpy(modelhLRT3,"K80+I");
+                        strcpy(modelhLRT3, "K80+I");
                     }
                 }
             }
             else {
                 if (TestEqualBaseFrequencies (JCI, F81I) < alpha) { /*R*/
-                    strcpy(modelhLRT3,"F81+I");
+                    strcpy(modelhLRT3, "F81+I");
                 }
                 else {
-                    strcpy(modelhLRT3,"JC+I");
+                    strcpy(modelhLRT3, "JC+I");
                 }
             }
         }
@@ -2015,27 +2106,27 @@ void hLRT3()
             if (TestTiequalsTv (JC, K80) < alpha) { /*S*/
                 if (TestEqualTiAndEqualTvRates (K80, SYM) < alpha) { /*T*/
                     if (TestEqualBaseFrequencies (SYM, GTR) < alpha) { /*U*/
-                        strcpy(modelhLRT3,"GTR");
+                        strcpy(modelhLRT3, "GTR");
                     }
                     else {
-                        strcpy(modelhLRT3,"SYM");
+                        strcpy(modelhLRT3, "SYM");
                     }
                 }
                 else {
                     if (TestEqualBaseFrequencies (K80, HKY) < alpha) { /*V*/
-                        strcpy(modelhLRT3,"HKY");
+                        strcpy(modelhLRT3, "HKY");
                     }
                     else {
-                        strcpy(modelhLRT3,"K80");
+                        strcpy(modelhLRT3, "K80");
                     }
                 }
             }
             else {
                 if (TestEqualBaseFrequencies (JC, F81) < alpha) { /*X*/
-                    strcpy(modelhLRT3,"F81");
+                    strcpy(modelhLRT3, "F81");
                 }
                 else {
-                    strcpy(modelhLRT3,"JC");
+                    strcpy(modelhLRT3, "JC");
                 }
             }
         }
@@ -2050,27 +2141,27 @@ void hLRT4()
         if (TestInvariableSites (GTRG, GTRIG) < alpha) { /*B*/
             if (TestEqualTiAndEqualTvRates (HKYIG, GTRIG) < alpha) { /*C*/
                 if (TestEqualBaseFrequencies (SYMIG, GTRIG) < alpha) { /*D*/
-                    strcpy(modelhLRT4,"GTR+I+G");
+                    strcpy(modelhLRT4, "GTR+I+G");
                 }
                 else {
-                    strcpy(modelhLRT4,"SYM+I+G");
+                    strcpy(modelhLRT4, "SYM+I+G");
                 }
             }
             else {
                 if (TestTiequalsTv (F81IG, HKYIG) < alpha) { /*E*/
                     if (TestEqualBaseFrequencies (K80IG, HKYIG) < alpha) { /*F*/
-                        strcpy(modelhLRT4,"HKY+I+G");
+                        strcpy(modelhLRT4, "HKY+I+G");
                     }
                     else {
-                        strcpy(modelhLRT4,"K80+I+G");
+                        strcpy(modelhLRT4, "K80+I+G");
                     }
                 }
                 else {
                     if (TestEqualBaseFrequencies (JCIG, F81IG) < alpha) { /*G*/
-                        strcpy(modelhLRT4,"F81+I+G");
+                        strcpy(modelhLRT4, "F81+I+G");
                     }
                     else {
-                        strcpy(modelhLRT4,"JC+I+G");
+                        strcpy(modelhLRT4, "JC+I+G");
                     }
                 }
             }
@@ -2078,27 +2169,27 @@ void hLRT4()
         else {
             if (TestEqualTiAndEqualTvRates (HKYG, GTRG) < alpha) { /*H*/
                 if (TestEqualBaseFrequencies (SYMG, GTRG) < alpha) { /*I*/
-                    strcpy(modelhLRT4,"GTR+G");
+                    strcpy(modelhLRT4, "GTR+G");
                 }
                 else {
-                    strcpy(modelhLRT4,"SYM+G");
+                    strcpy(modelhLRT4, "SYM+G");
                 }
             }
             else {
                 if (TestTiequalsTv (F81G, HKYG) < alpha) { /*J*/
                     if (TestEqualBaseFrequencies (K80G, HKYG) < alpha) { /*K*/
-                        strcpy(modelhLRT4,"HKY+G");
+                        strcpy(modelhLRT4, "HKY+G");
                     }
                     else {
-                        strcpy(modelhLRT4,"K80+G");
+                        strcpy(modelhLRT4, "K80+G");
                     }
                 }
                 else {
                     if (TestEqualBaseFrequencies (JCG, F81G) < alpha) { /*L*/
-                        strcpy(modelhLRT4,"F81+G");
+                        strcpy(modelhLRT4, "F81+G");
                     }
                     else {
-                        strcpy(modelhLRT4,"JC+G");
+                        strcpy(modelhLRT4, "JC+G");
                     }
                 }
             }
@@ -2108,27 +2199,27 @@ void hLRT4()
         if (TestInvariableSites (GTR, GTRI) < alpha) { /*M*/
             if (TestEqualTiAndEqualTvRates (HKYI, GTRI) < alpha) { /*N*/
                 if (TestEqualBaseFrequencies (SYMI, GTRI) < alpha) { /*O*/
-                    strcpy(modelhLRT4,"GTR+I");
+                    strcpy(modelhLRT4, "GTR+I");
                 }
                 else {
-                    strcpy(modelhLRT4,"SYM+I");
+                    strcpy(modelhLRT4, "SYM+I");
                 }
             }
             else {
                 if (TestTiequalsTv (F81I, HKYI) < alpha) { /*P*/
                     if (TestEqualBaseFrequencies (K80I, HKYI) < alpha) { /*Q*/
-                        strcpy(modelhLRT4,"HKY+I");
+                        strcpy(modelhLRT4, "HKY+I");
                     }
                     else {
-                        strcpy(modelhLRT4,"K80+I");
+                        strcpy(modelhLRT4, "K80+I");
                     }
                 }
                 else {
                     if (TestEqualBaseFrequencies (JCI, F81I) < alpha) { /*R*/
-                        strcpy(modelhLRT4,"F81+I");
+                        strcpy(modelhLRT4, "F81+I");
                     }
                     else {
-                        strcpy(modelhLRT4,"JC+I");
+                        strcpy(modelhLRT4, "JC+I");
                     }
                 }
             }
@@ -2136,27 +2227,27 @@ void hLRT4()
         else {
             if (TestEqualTiAndEqualTvRates (HKY, GTR) < alpha) { /*S*/
                 if (TestEqualBaseFrequencies (SYM, GTR) < alpha) { /*T*/
-                    strcpy(modelhLRT4,"GTR");
+                    strcpy(modelhLRT4, "GTR");
                 }
                 else {
-                    strcpy(modelhLRT4,"SYM");
+                    strcpy(modelhLRT4, "SYM");
                 }
             }
             else {
                 if (TestTiequalsTv (F81, HKY) < alpha) { /*U*/
                     if (TestEqualBaseFrequencies (K80, HKY) < alpha) { /*V*/
-                        strcpy(modelhLRT4,"HKY");
+                        strcpy(modelhLRT4, "HKY");
                     }
                     else {
-                        strcpy(modelhLRT4,"K80");
+                        strcpy(modelhLRT4, "K80");
                     }
                 }
                 else {
                     if (TestEqualBaseFrequencies (JC, F81) < alpha) { /*X*/
-                        strcpy(modelhLRT4,"F81");
+                        strcpy(modelhLRT4, "F81");
                     }
                     else {
-                        strcpy(modelhLRT4,"JC");
+                        strcpy(modelhLRT4, "JC");
                     }
                 }
             }
@@ -2175,7 +2266,7 @@ static void PrintTitle (FILE *fp)
     fprintf(fp, "\n\"Nylander, J.A.A. 2004. MrModeltest %s. Program", VERSION_NUMBER);
     fprintf(fp, " distributed by the author. Evolutionary Biology Centre, Uppsala University.\"");
     fprintf(fp, "\n\nContact:");
-    fprintf(fp, "\njohan.nylander@ebc.uu.se.");
+    fprintf(fp, "\njohan.nylander@nbis.se.");
     fprintf(fp, "\n\nCredits: David Posada is thanked for supplying the Modeltest code.");
     fprintf(fp, "\n______________________________________________________________________\n\n");
 }
@@ -2188,14 +2279,11 @@ static void PrintDate (FILE *fp)
 
     now = time(NULL);
     date = ctime(&now);
-    fprintf(fp, "%s",date);
+    fprintf(fp, "%s", date);
 }
 
 /************** CheckNA **********************/
-/*
-    If value is NA prints "-"
-
-*/
+/* If value is NA prints "-" */
 static char *CheckNA (double value)
 {
     char *string;
@@ -2213,44 +2301,48 @@ static char *CheckNA (double value)
 /*********************** PrintUsage ********************************/
 static void PrintUsage()
 {
-    fprintf(stderr,"\n HELP \n");
-    fprintf(stderr,"\nMrModeltest is a program for comparing models of evolution using likelihood ");
-    fprintf(stderr,"ratio tests and the AIC criterion. The input are log likelihood scores. ");
-    fprintf(stderr,"You can input raw scores or a Paup matrix resulting from the execution ");
-    fprintf(stderr,"of the provided block of Paup commands (MrModelblock).");
-    fprintf(stderr,"\nThe program can also enter in a calculator mode for obtaining ");
-    fprintf(stderr,"the P-value associated with the log likelihood ratio statistic for two given ");
-    fprintf(stderr,"scores or the AIC value for entered scores.\n");
-    fprintf(stderr,"\nNOTE --- MrModeltest only tests 24 models (Modeltest uses 56). However ");
-    fprintf(stderr,"all of the 24 models can be specified in MrBayes (version 3).");
-    fprintf(stderr," MrModeltest also use (by default) four different hierarchies when conducting the");
-    fprintf(stderr," likelihood ratio tests. The hierarchies are described in detail by");
-    fprintf(stderr," Posada & Crandall. 2001. Systematic Biology, 50:580-601 (Figure 4).");
-    fprintf(stderr,"\n\nJC:    Jukes and Cantor 1969");
-    fprintf(stderr,"\nK80:   Kimura 2-parameters, Kimura 1980 (also known as K2P)");
-    fprintf(stderr,"\nSYM:   Symmetrical model, Zharkikh 1994");
-    fprintf(stderr,"\nF81:   Felsenstein 1981");
-    fprintf(stderr,"\nHKY:   Hasegawa-Kishino-Yano 1985");
-    fprintf(stderr,"\nGTR:   General time reversible, Rodriguez et al 1990 (also known as REV)");
-    fprintf(stderr,"\nI:     invariable sites");
-    fprintf(stderr,"\nG:     gamma distribution");
-    fprintf(stderr,"\n\nUsage:");
-    fprintf(stderr,"\n         -? : help");
-    fprintf(stderr,"\n         -2 : use alternative hLRT2 hierarchy (starting with GTR+I+G vs. SYM+I+G)");
-    fprintf(stderr,"\n         -3 : use alternative hLRT3 hierarchy (starting with JC vs. JC+G)");
-    fprintf(stderr,"\n         -4 : use alternative hLRT4 hierarchy (starting with GTRIG vs. GTRI)");
-    fprintf(stderr,"\n         -a : alpha level (e.g. -a0.01)");
-    fprintf(stderr,"\n         -d : debug level (e.g. -d2)");
-    fprintf(stderr,"\n         -f : input from a file for obtaining AIC values");
-    fprintf(stderr,"\n         -h : help");
-    fprintf(stderr,"\n         -i : AIC calculator mode");
-    fprintf(stderr,"\n         -l : LRT calculator mode");
-    fprintf(stderr,"\n         -n : sample size or number of characters (all or just variable). Forces the use of AICc");
-    fprintf(stderr,"\n         -t : number of taxa. Forces to include branch lengths as parameters");
-    fprintf(stderr,"\n         -v : prints version number");
-    fprintf(stderr,"\n         -w : confidence interval for averaging (e.g., -w0.95) (default is w=1.0)");
-    fprintf(stderr,"\n\nUNIX/MACOSX/WIN usage: mrmodeltest2 [-d -a -c -t -2 -3 -4 -l -i -f -? -h] < mrmodel.scores > outfile\n\n");
-    /*fprintf(stderr,"\n\nHit return to close this window!\n\n");*/    /*For windows.*/
+    fprintf(stderr, "\n HELP \n");
+    fprintf(stderr, "\nMrModeltest2 is a program for comparing models of evolution using likelihood ");
+    fprintf(stderr, "ratio tests and the AIC criterion. The input are log likelihood scores. ");
+    fprintf(stderr, "You can input raw scores or a Paup matrix resulting from the execution ");
+    fprintf(stderr, "of the provided block of Paup commands (MrModelblock).");
+    fprintf(stderr, "\nNote that from version v.2.4, the program only reads output");
+    fprintf(stderr, "from PAUP* v.4.0a155 (or later).");
+    fprintf(stderr, "\nThe program can also enter in a calculator mode for obtaining ");
+    fprintf(stderr, "the P-value associated with the log likelihood ratio statistic for two given ");
+    fprintf(stderr, "scores or the AIC value for entered scores.\n");
+    fprintf(stderr, "\nNOTE --- MrModeltest2 only tests 24 models (Modeltest uses 56). However ");
+    fprintf(stderr, "all of the 24 models can be specified in MrBayes (version 3).");
+    fprintf(stderr, " MrModeltest2 also use (by default) four different hierarchies when conducting the");
+    fprintf(stderr, " likelihood ratio tests. The hierarchies are described in detail by");
+    fprintf(stderr, " Posada & Crandall. 2001. Systematic Biology, 50:580-601 (Figure 4).");
+    fprintf(stderr, "\n\nJC:    Jukes and Cantor 1969");
+    fprintf(stderr, "\nK80:   Kimura 2-parameters, Kimura 1980 (also known as K2P)");
+    fprintf(stderr, "\nSYM:   Symmetrical model, Zharkikh 1994");
+    fprintf(stderr, "\nF81:   Felsenstein 1981");
+    fprintf(stderr, "\nHKY:   Hasegawa-Kishino-Yano 1985");
+    fprintf(stderr, "\nGTR:   General time reversible, Rodriguez et al 1990 (also known as REV)");
+    fprintf(stderr, "\nI:     invariable sites");
+    fprintf(stderr, "\nG:     gamma distribution");
+    fprintf(stderr, "\n\nUsage:");
+    fprintf(stderr, "\n         -? : help");
+    fprintf(stderr, "\n         -2 : use alternative hLRT2 hierarchy (starting with GTR+I+G vs. SYM+I+G)");
+    fprintf(stderr, "\n         -3 : use alternative hLRT3 hierarchy (starting with JC vs. JC+G)");
+    fprintf(stderr, "\n         -4 : use alternative hLRT4 hierarchy (starting with GTRIG vs. GTRI)");
+    fprintf(stderr, "\n         -a : alpha level (e.g. -a0.01)");
+    fprintf(stderr, "\n         -d : debug level (e.g. -d2)");
+    fprintf(stderr, "\n         -f : input from a file for obtaining AIC values");
+    fprintf(stderr, "\n         -h : help");
+    fprintf(stderr, "\n         -i : AIC calculator mode");
+    fprintf(stderr, "\n         -l : LRT calculator mode");
+    fprintf(stderr, "\n         -n : sample size or number of characters (all or just variable). Forces the use of AICc");
+    fprintf(stderr, "\n         -t : number of taxa. Forces to include branch lengths as parameters");
+    fprintf(stderr, "\n         -v : prints version number");
+    fprintf(stderr, "\n         -w : confidence interval for averaging (e.g., -w0.95) (default is w=1.0)");
+    fprintf(stderr, "\n\nUNIX/MACOSX/WIN usage: mrmodeltest2 [-d -a -c -t -2 -3 -4 -l -i -f -w -? -h] < mrmodel.scores > outfile\n\n");
+    if (WIN == 1) {
+        fprintf(stderr, "\n\nHit return to close this window!\n\n");    /*For windows.*/
+    }
 }
 
 /********************** Allocate *************************/

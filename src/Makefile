@@ -1,15 +1,16 @@
-CC = gcc
-CFLAGS  = -O3 -Wno-unused-result -Wall 
-LIBS = -lm
+CFLAGS= -Wall -Wextra -Wpedantic
 
-TARGET = mrmodeltest2
+LDLIBS= -lm
 
-SRC = $(TARGET).c
+TARGET= mrmodeltest2
+
+.PHONY: all win clean
 
 all: $(TARGET)
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LIBS)
+win: CFLAGS += -DWIN=1
+
+win: all
 
 clean:
 	$(RM) $(TARGET)
