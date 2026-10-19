@@ -9,8 +9,7 @@ MrModeltest 2.4 README, Sept 2018
 MrModeltest 2.4 by Johan A. A. Nylander.
 Orignal code by David Posada, U. Vigo, Spain.
 
-E-mail: johan.nylander\@nbis.se
-
+*Update 2026-10-19: This repository is now archived*
 
 Description
 -----------
